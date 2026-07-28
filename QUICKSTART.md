@@ -12,6 +12,14 @@ window opens, starts the app, and your browser opens to it automatically (the
 first launch takes a minute while it installs what it needs; later launches are
 quick). If the browser doesn't open on its own, go to **http://127.0.0.1:8420**.
 
+**The very first launch asks for your Anthropic API key** (paste it into the
+terminal window when prompted — it starts with `sk-ant-`). It then does a tiny
+one-token check to confirm the key works before opening the app, and saves it so
+you're never asked again. If your organization uses OneDrive/SharePoint invoice
+links, it also offers to collect the Microsoft Graph tenant and client IDs at
+the same time — press Enter to skip those; you can connect from the app later.
+Once a key is saved, none of this happens again on later launches.
+
 **That terminal window *is* the app.** Keep it open while you work. The app runs
 only on this computer — nothing is exposed to the network or the internet.
 

@@ -171,7 +171,20 @@ def cmd_probe_limits(args: argparse.Namespace) -> int:
         return 1
 
     client = pipeline.build_client()
-    payload = pipeline.measure_rate_limits(client, config.DEFAULT_MODEL)
+    try:
+        payload = pipeline.measure_rate_limits(client, config.DEFAULT_MODEL)
+    except Exception as exc:  # noqa: BLE001 -- give the operator one clean line, never a traceback
+        # A bad key (401), a revoked key, or no network all land here. The
+        # launcher's first-run key check reads this command's exit code, so a
+        # clean message + non-zero return is what turns a mistyped key into a
+        # "try again" prompt instead of a wall of stack trace.
+        print(
+            f"ERROR: could not verify the API key against Anthropic "
+            f"({type(exc).__name__}: {exc}). Check that the key is correct and "
+            f"that this machine can reach the internet.",
+            file=sys.stderr,
+        )
+        return 1
     print(f"model: {payload['model']}")
     print(f"requests_limit: {payload['requests_limit']}")
     print(f"input_tokens_limit: {payload['input_tokens_limit']}")
