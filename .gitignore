@@ -1,0 +1,49 @@
+.env
+__pycache__/
+*.pyc
+# Invoice PDFs/CSVs are real business documents -- never in git, and they now
+# live directly in externalinvoices/ (per-invoice, named by invoice number).
+# The two splitter tools, the README, and the SKILL are plain text with no
+# invoice content, so they're explicitly shipped (see externalinvoices/README.md).
+externalinvoices/*
+!externalinvoices/split_q1_2026_manifest.py
+!externalinvoices/make_by_invoice_no.py
+!externalinvoices/README.md
+!externalinvoices/SKILL.md
+data/
+# MSAL delegated-auth token cache (Microsoft Graph / OneDrive-SharePoint
+# invoice links) -- lives under DATA_ROOT normally (see .gitignore's `data/`
+# rule above), but DATA_ROOT falls back to the repo root when GNA_DATA_ROOT
+# is unset, so this stays an explicit rule too.
+graph_token_cache.bin
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+# workspace/ holds operator data (the uploaded workbook + any lookup sheets)
+# plus two tracked text files (README.md, user_deal_context.md template). Exclude
+# every spreadsheet/data extension so a data file dropped here can never be
+# committed -- this is what keeps a fresh `git init` provably data-free.
+workspace/*.xlsb
+workspace/*.xlsx
+workspace/*.xls
+workspace/*.csv
+workspace/results/*
+!workspace/results/.gitkeep
+# Operator-authored deal notes: config.DEAL_CONTEXT_MD hard-codes this path, but
+# its content is real deal context. Ignore the live file; ship only the template
+# so a fresh clone has a starter to copy from.
+workspace/user_deal_context.md
+!workspace/user_deal_context.md.template
+# tempUI/ is the operator's design-tool export (Odyssey.dc.html + support.js +
+# logos) -- kept as the design reference. Its cache/paste-scratch artifacts are not.
+tempUI/.thumbnail
+tempUI/uploads/
+*.zip
+# handoff/ is internal build history (dev notes, operator emails, prior
+# audits) -- never ships in the public repo.
+handoff/
+# Personal Claude Code tool config/state -- local to this machine.
+.claude/

@@ -1,0 +1,825 @@
+// app.js — hand-rolled view store + router + event delegation.
+//
+// No framework, no build step (v2 UI handoff §5): one flat `state` object,
+// `setState(patch)` merges + re-renders, screens are pure `render(state) ->
+// html string` functions. User interaction never wires an inline onclick —
+// every element that does something carries a `data-action="name"` (or
+// `data-oninput="name"` / `data-onchange="name"`) attribute, and ONE
+// delegated listener per event type (attached once, here) looks the name up
+// in `actions` and calls it. This is the same "hand-rolled, no rich
+// framework" spirit as gna_pipeline/console.py.
+//
+// Wave 3 swapped the adapter from `mock-adapter.js` (scripted fake data, no
+// network) to `real-adapter.js` (talks to gna_server's actual REST/SSE
+// endpoints). This is the ONLY change that swap required — every screen and
+// action was written against this shared interface from the start (see
+// mock-adapter.js's header comment for the exact contract). `mock-adapter.js`
+// stays in the tree as the interface reference and for offline UI dev: point
+// this one import back at it to run the whole app with no backend.
+
+import { adapter } from './real-adapter.js';
+
+import * as heroValidation from './screens/hero-validation.js';
+import * as launch from './screens/launch.js';
+import * as configModal from './screens/configure-modal.js';
+import * as contextModal from './screens/context-modal.js';
+import * as forecast from './screens/forecast.js';
+import * as process_ from './screens/process.js';
+import * as output from './screens/output.js';
+import * as settings from './screens/settings.js';
+import * as guide from './screens/guide.js';
+import * as timeout_ from './screens/timeout.js';
+import { escapeHtml } from './screens/escape.js';
+
+const root = document.getElementById('app-root');
+
+// ---------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------
+
+const state = {
+  view: 'main', // 'main' | 'launch' | 'forecast' | 'process' | 'output' | 'settings' | 'guide'
+  prevView: 'main',
+  heroEntered: false,
+
+  // Set true once the liveness ping (below) can no longer reach the server,
+  // i.e. it idle-timed-out and shut down. Short-circuits render() to the
+  // terminal "session timed out" screen.
+  sessionTimedOut: false,
+
+  // Q2 two-file upload + validation: the multi-tab G&A workbook and the flat
+  // A&T workbook are flattened server-side into ONE workbook that everything
+  // downstream reads. Phase tracks that flatten+validate step.
+  workbookPhase: 'empty', // empty | checking | confirmed | error
+  workbookName: '',
+  workbookChecks: [],
+  workbookRowCount: 0,
+  hasExistingClassifications: false,
+  gaFile: null, // {name} | null — the G&A slot
+  atFile: null, // {name} | null — the A&T slot
+  dragActiveGa: false,
+  dragActiveAt: false,
+  flattenSummary: null, // {ga_tabs_included, ga_tabs_skipped, at_rows, total_rows}
+
+  // quarters (real quarters present in the flattened workbook)
+  quarters: [],
+  quartersWarnings: [],
+
+  // Launch inputs: Additional Context + External Invoices
+  userDealContext: '',
+  invoiceFiles: [], // [{name, ok, reason?}]
+  ctxOpen: false,
+  ctxError: '',
+
+  // OneDrive/SharePoint access (optional) — connecting lets invoice_read
+  // fetch OneDrive/SharePoint invoice links via Microsoft Graph instead of
+  // failing them anonymously. Not connecting is fine; Run then requires
+  // oneDriveAck instead (see actions.runBtnClick).
+  oneDriveStatus: 'idle', // idle | connecting | connected | error
+  oneDriveError: null,
+  oneDriveAck: false,
+  oneDriveAckMissing: false, // true after a blocked Run attempt -- highlights the ack checkbox red
+
+  // Configure modal: quarter pick + min-USD materiality knob
+  configOpen: false,
+  configured: false,
+  selectedQuarter: null,
+  minUsd: null,
+
+  // Forecast + money gate (v2 §4.6 — new, not in the design prototype)
+  runKind: null, // 'run' | 'deal-profile' | 'recover'
+  runId: null,
+  runState: 'idle',
+  reattaching: false, // true only while rebuilding a live view after a page refresh mid-run
+  sweepForecast: null,
+  classifyForecast: null,
+  readyChecked: false,
+  confirmId: null,
+  confirmPrompt: '',
+
+  // Process / live run (v2 §4.7)
+  phase: null, // 'build_profile' | 'classify' | 'done'
+  statusSnapshot: null,
+  phase0Stats: null,
+  liveRows: [],
+  tally: {},
+  runMessage: '',
+
+  // Output (v2 §4.8)
+  summary: null,
+  artifacts: [],
+
+  // Settings (v2 §4.10) + Security (v2 §9)
+  settingsKey: 'classifier',
+  settingsContent: '',
+  settingsSavedNote: '',
+  apiKeyPresent: false,
+  invoiceLibrary: { dir_ready: false, csv_ready: false },
+
+  // Guide (v2 §4.11)
+  guideKey: 'quickstart',
+  guideMarkdown: '',
+
+  // Cross-cutting
+  banner: null, // {kind: 'error'|'warn'|'info', text}
+};
+
+let eventsHandle = null;
+
+function setState(patch) {
+  Object.assign(state, patch);
+  render();
+}
+
+/** Mutate state without a re-render — for live-typing fields (word gauges,
+ * settings editor) where a full re-render would steal focus/cursor position
+ * out of the input the operator is actively typing in. Callers update the
+ * one satellite DOM node they care about (e.g. a word counter) directly. */
+function pokeState(patch) {
+  Object.assign(state, patch);
+}
+
+// ---------------------------------------------------------------------
+// Actions — the only thing screens call. Each either mutates local state,
+// calls the adapter, or both.
+// ---------------------------------------------------------------------
+
+function showBanner(kind, text) {
+  setState({ banner: { kind, text } });
+}
+function clearBanner() {
+  if (state.banner) setState({ banner: null });
+}
+
+async function refreshServerState() {
+  const s = await adapter.getState();
+  pokeState({
+    apiKeyPresent: s.api_key_present,
+    invoiceLibrary: s.invoice_library,
+  });
+  return s;
+}
+
+async function refreshQuarters() {
+  if (state.workbookPhase !== 'confirmed') return;
+  try {
+    const q = await adapter.getQuarters();
+    setState({ quarters: q.quarters, quartersWarnings: q.warnings });
+  } catch (err) {
+    showBanner('error', `Could not read quarters: ${err.message}`);
+  }
+}
+
+// -- OneDrive/SharePoint access (optional) --------------------------------
+// A prior server process may already hold a cached token (see
+// gna_server/routes_graph.py's is_connected() check) -- this reflects that
+// on load, without requiring a fresh click every restart.
+async function refreshGraphStatus() {
+  try {
+    const r = await adapter.getGraphStatus();
+    const error = r.error || null;
+    // Only touch state (and trigger render()'s full root.innerHTML rebuild,
+    // which replays every CSS entrance animation on the page) when the
+    // status actually changed -- otherwise a same-status poll every 2s would
+    // re-render the whole app for nothing while "connecting".
+    if (r.status !== state.oneDriveStatus || error !== state.oneDriveError) {
+      setState({ oneDriveStatus: r.status, oneDriveError: error });
+    }
+    if (r.status === 'connecting') setTimeout(refreshGraphStatus, 2000);
+  } catch (_err) {
+    // Transient fetch failure -- keep polling on the same cadence instead of
+    // silently stranding the UI on "Connecting..." forever.
+    if (state.oneDriveStatus === 'connecting') setTimeout(refreshGraphStatus, 2000);
+  }
+}
+
+async function connectOneDrive() {
+  if (state.oneDriveStatus === 'connecting') return;
+  setState({ oneDriveStatus: 'connecting', oneDriveError: null });
+  try {
+    await adapter.connectOneDrive();
+  } catch (err) {
+    setState({ oneDriveStatus: 'error', oneDriveError: err.message });
+    return;
+  }
+  setTimeout(refreshGraphStatus, 1500);
+}
+
+const actions = {
+  // -- Hero --
+  enterMain: () => { if (!state.heroEntered) setState({ heroEntered: true }); },
+
+  // -- Header nav --
+  goHome: () => setState({ view: 'main' }),
+  openGuide: () => {
+    adapter.getDoc(state.guideKey).then((r) => {
+      setState({ prevView: state.view, view: 'guide', guideMarkdown: r.markdown });
+    });
+  },
+  openSettings: () => {
+    adapter.getSettings(state.settingsKey).then((r) => {
+      setState({ prevView: state.view, view: 'settings', settingsContent: r.content, settingsSavedNote: '' });
+    });
+  },
+  goBack: () => setState({ view: state.prevView || 'main' }),
+  goLaunch: () => setState({ view: 'launch' }),
+
+  // -- Q2 two-file dropzones (G&A + A&T -> flatten). `slot` is 'ga' | 'at',
+  //    read off data-slot; when BOTH slots hold a file, maybeFlattenQ2 fires. --
+  onQ2Browse: (event, ds) => {
+    const filled = ds.slot === 'ga' ? gaFileObj : atFileObj;
+    if (filled || state.workbookPhase === 'checking') return; // remove to change; no-op while flattening
+    document.getElementById(`q2-input-${ds.slot}`)?.click();
+  },
+  onQ2File: (event, ds) => {
+    const file = event.target.files && event.target.files[0];
+    if (file) setQ2Slot(ds.slot, file);
+  },
+  onQ2Drop: (event, ds) => {
+    event.preventDefault();
+    setState(ds.slot === 'ga' ? { dragActiveGa: false } : { dragActiveAt: false });
+    if (state.workbookPhase === 'checking') return;
+    const file = event.dataTransfer?.files?.[0];
+    if (file) setQ2Slot(ds.slot, file);
+  },
+  onQ2DragOver: (event) => event.preventDefault(),
+  onQ2DragEnter: (event, ds) => { event.preventDefault(); setState(ds.slot === 'ga' ? { dragActiveGa: true } : { dragActiveAt: true }); },
+  onQ2DragLeave: (event, ds) => { event.preventDefault(); setState(ds.slot === 'ga' ? { dragActiveGa: false } : { dragActiveAt: false }); },
+  removeQ2: (event, ds) => { event.stopPropagation(); clearQ2Slot(ds.slot); },
+  continueToLaunch: () => setState({ view: 'launch' }),
+
+  // -- Launch: Additional Context modal (v2 §4.3) --
+  openCtx: () => setState({ ctxOpen: true, ctxError: '' }),
+  closeCtx: () => setState({ ctxOpen: false }),
+  onCtxInput: (event) => {
+    const { text, error } = limitContextWords(event.target.value);
+    pokeState({ userDealContext: text, ctxError: error });
+    updateCtxSatellites();
+  },
+  onCtxBrowse: () => document.getElementById('ctx-file-input')?.click(),
+  onCtxFile: (event) => readContextFile(event.target.files?.[0]),
+  onCtxDrop: (event) => { event.preventDefault(); readContextFile(event.dataTransfer?.files?.[0]); },
+  onDragOver: (event) => event.preventDefault(),
+
+  // -- Launch: Invoices dropzone (v2 §4.3/§6.3) — a folder can be supplied
+  //    either by browsing (webkitdirectory input, flattens to a FileList on
+  //    its own) or by dragging it onto the tile (needs the FileSystemEntry
+  //    walk below — a dropped folder never shows up in dataTransfer.files). --
+  onInvoiceBrowse: () => document.getElementById('invoice-input')?.click(),
+  onInvoiceFolderBrowse: (event) => { event.stopPropagation(); document.getElementById('invoice-folder-input')?.click(); },
+  onInvoiceFiles: (event) => { void uploadInvoices([...(event.target.files || [])]); },
+  onInvoiceDrop: (event) => {
+    event.preventDefault();
+    void collectDroppedFiles(event.dataTransfer).then(uploadInvoices);
+  },
+
+  // -- Configure modal (v2 §4.4) --
+  openConfig: () => setState({ configOpen: true }),
+  closeConfig: () => setState({ configOpen: false }),
+  stopPropagation: (event) => event.stopPropagation(),
+  onQuarterSelect: (event) => pokeState({ selectedQuarter: event.target.value }),
+  onMinUsdInput: (event) => pokeState({ minUsd: event.target.value === '' ? null : Number(event.target.value) }),
+  saveConfig: () => {
+    if (!state.selectedQuarter && state.quarters.length) {
+      pokeState({ selectedQuarter: state.quarters[state.quarters.length - 1].label });
+    }
+    setState({ configOpen: false, configured: true });
+  },
+
+  // -- Launch: OneDrive access (optional) --
+  connectOneDrive: () => { void connectOneDrive(); },
+  toggleOneDriveAck: () => {
+    const checked = !state.oneDriveAck;
+    setState({ oneDriveAck: checked, oneDriveAckMissing: false });
+    if (checked) clearBanner();
+  },
+
+  // -- Launch: Run --
+  runBtnClick: () => {
+    const oneDriveOk = state.oneDriveStatus === 'connected' || state.oneDriveAck;
+    if (!state.configured) {
+      showBanner('error', 'Configure the quarter and materiality threshold before running.');
+      return;
+    }
+    if (!oneDriveOk) {
+      setState({ oneDriveAckMissing: true });
+      showBanner('error', 'Check the OneDrive acknowledgment box below, or connect OneDrive, before running.');
+      return;
+    }
+    void goToForecast();
+  },
+
+  // -- Forecast + money gate (v2 §4.6) --
+  toggleReady: () => setState({ readyChecked: !state.readyChecked }),
+  proceedRun: () => {
+    if (!state.confirmId) return;
+    void adapter.confirmRun(state.confirmId, true);
+    setState({ view: 'process', confirmId: null, reattaching: false });
+  },
+  cancelForecast: () => {
+    if (state.confirmId) void adapter.confirmRun(state.confirmId, false);
+    setState({ view: 'launch', reattaching: false });
+  },
+
+  // -- Process / live run (v2 §4.7) --
+  stopRun: () => { void adapter.cancelRun(); },
+  backToLaunchFromProcess: () => setState({ view: 'launch' }),
+
+  // -- Output (v2 §4.8) --
+  downloadArtifact: (event, dataset) => { window.location.href = adapter.downloadUrl(dataset.key); },
+  recoverNow: async () => {
+    const r = await adapter.startRun({ kind: 'recover', quarter: state.selectedQuarter });
+    setState({ runId: r.run_id, runKind: 'recover', view: 'process', phase: null, liveRows: [], tally: {} });
+    watchRun();
+  },
+  backToLaunchFromOutput: () => setState({ view: 'launch', runState: 'idle', runId: null }),
+
+  // -- Settings (v2 §4.10) --
+  selectSettingsTab: (event, dataset) => {
+    adapter.getSettings(dataset.key).then((r) => setState({ settingsKey: dataset.key, settingsContent: r.content, settingsSavedNote: '' }));
+  },
+  onSettingsInput: (event) => pokeState({ settingsContent: event.target.value, settingsSavedNote: '' }),
+  saveSettings: async () => {
+    try {
+      await adapter.putSettings(state.settingsKey, state.settingsContent);
+      setState({ settingsSavedNote: 'Saved — this is now the live doctrine every run reads.' });
+    } catch (err) {
+      showBanner('error', `Could not save: ${err.message}`);
+    }
+  },
+
+  // -- Guide (v2 §4.11) --
+  selectGuideTab: (event, dataset) => {
+    adapter.getDoc(dataset.key).then((r) => setState({ guideKey: dataset.key, guideMarkdown: r.markdown }));
+  },
+
+  dismissBanner: clearBanner,
+};
+
+// ---------------------------------------------------------------------
+// Async helpers backing the actions above
+// ---------------------------------------------------------------------
+
+// The two raw File objects live outside `state` (Files aren't render data and
+// don't survive a re-render round-trip); `state.gaFile`/`state.atFile` hold
+// just the {name} for display. When both are present, flatten fires.
+let gaFileObj = null;
+let atFileObj = null;
+
+function setQ2Slot(slot, file) {
+  if (slot === 'ga') { gaFileObj = file; setState({ gaFile: { name: file.name } }); }
+  else { atFileObj = file; setState({ atFile: { name: file.name } }); }
+  void maybeFlattenQ2();
+}
+
+function clearQ2Slot(slot) {
+  if (slot === 'ga') gaFileObj = null; else atFileObj = null;
+  // Removing either input invalidates the flattened result and any config
+  // derived from it (its quarters).
+  setState({
+    [slot === 'ga' ? 'gaFile' : 'atFile']: null,
+    workbookPhase: 'empty', workbookName: '', workbookChecks: [], workbookRowCount: 0,
+    flattenSummary: null, quarters: [], configured: false, selectedQuarter: null,
+  });
+}
+
+async function maybeFlattenQ2() {
+  if (!gaFileObj || !atFileObj) return;      // need both files before flattening
+  if (state.workbookPhase === 'checking') return; // a flatten is already in flight
+  setState({
+    workbookPhase: 'checking', workbookName: 'q2_flat.xlsx',
+    configured: false, selectedQuarter: null,
+  });
+  try {
+    const r = await adapter.uploadWorkbookQ2(gaFileObj, atFileObj);
+    // A 200 means the pair flattened, NOT that the result is usable. Only
+    // advance to 'confirmed' when EVERY validation check passed and it has
+    // rows — a bad pair (wrong files, no MRI tabs) comes back with failed
+    // checks and must stop here as an error, never a green "validated".
+    const usable = r.checks.every((c) => c.ok) && r.row_count > 0;
+    setState({
+      workbookPhase: usable ? 'confirmed' : 'error',
+      workbookName: r.name,
+      workbookChecks: r.checks,
+      workbookRowCount: r.row_count,
+      hasExistingClassifications: r.has_existing_classifications,
+      flattenSummary: r.flatten || null,
+    });
+    if (usable) await refreshQuarters();
+  } catch (err) {
+    setState({ workbookPhase: 'error', workbookChecks: [], flattenSummary: null });
+    showBanner('error', `Flatten failed: ${err.message}`);
+  }
+}
+
+function isPdfFile(file) { return /\.pdf$/i.test(file.name || ''); }
+
+async function uploadInvoices(files) {
+  // A folder (browsed or dropped) brings along whatever else lives next to
+  // the invoices (readmes, .DS_Store, spreadsheets, subfolders of the same);
+  // drop those silently here rather than round-tripping each one to the
+  // server just to get "not a .pdf file" back.
+  const pdfFiles = files.filter(isPdfFile);
+  if (!pdfFiles.length) return;
+  try {
+    const r = await adapter.uploadInvoices(pdfFiles);
+    const merged = [
+      ...state.invoiceFiles,
+      ...r.saved.map((name) => ({ name, ok: true })),
+      ...r.rejected.map((x) => ({ name: x.name, ok: false, reason: x.reason })),
+    ];
+    setState({ invoiceFiles: merged });
+  } catch (err) {
+    showBanner('error', `Invoice upload failed: ${err.message}`);
+  }
+}
+
+// A dropped FOLDER never appears in dataTransfer.files (that FileList only
+// ever holds actual files) -- reading one requires the FileSystemEntry API:
+// walk each dropped entry, recursing into directories, and collect every
+// nested File. Falls back to the flat file list on a browser without
+// webkitGetAsEntry (dropped files still work; a dropped folder just won't).
+async function collectDroppedFiles(dataTransfer) {
+  const items = dataTransfer?.items;
+  if (!items || !items.length || typeof items[0].webkitGetAsEntry !== 'function') {
+    return [...(dataTransfer?.files || [])];
+  }
+  const entries = [...items].map((item) => item.webkitGetAsEntry()).filter(Boolean);
+  const out = [];
+  await Promise.all(entries.map((entry) => walkEntry(entry, out)));
+  return out;
+}
+
+function walkEntry(entry, out) {
+  return new Promise((resolve) => {
+    if (entry.isFile) {
+      entry.file((file) => { out.push(file); resolve(); }, () => resolve());
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      // readEntries() returns AT MOST ~100 entries per call by spec -- must
+      // keep calling until it reports an empty batch, or a large folder
+      // silently loses everything past the first page.
+      const readNextBatch = () => {
+        reader.readEntries((batch) => {
+          if (!batch.length) { resolve(); return; }
+          Promise.all(batch.map((child) => walkEntry(child, out))).then(readNextBatch);
+        }, () => resolve());
+      };
+      readNextBatch();
+    } else {
+      resolve();
+    }
+  });
+}
+
+const WORD_MAX = 2750;
+const CHAR_MAX = 22000;
+function wordCount(str) { return str.trim() ? str.trim().split(/\s+/).length : 0; }
+function limitContextWords(str) {
+  let s = str.slice(0, CHAR_MAX);
+  const tokens = s.split(/(\s+)/);
+  let n = 0, out = '';
+  for (const tok of tokens) {
+    if (/\S/.test(tok)) { if (n >= WORD_MAX) break; n++; }
+    out += tok;
+  }
+  return { text: out, error: '' };
+}
+function readContextFile(file) {
+  if (!file) return;
+  pokeState({ ctxError: '' });
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (ext === 'docx') {
+    // A .docx is binary (a zip of XML) — the browser can't readAsText it. The
+    // server extracts the text in memory (nothing written to disk) and returns
+    // it; the result is folded into the session-only context, same as typing.
+    adapter.extractContext(file)
+      .then((r) => mergeContextText(String(r.text || '')))
+      .catch((err) => setState({ ctxError: `Could not read that document: ${err.message}` }));
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => mergeContextText(String(reader.result || ''));
+  reader.onerror = () => setState({ ctxError: 'Could not read that file.' });
+  reader.readAsText(file);
+}
+
+function mergeContextText(text) {
+  const combined = (state.userDealContext ? state.userDealContext + '\n' : '') + text;
+  if (wordCount(combined) > WORD_MAX || combined.length > CHAR_MAX) {
+    setState({ ctxError: `File not added — it exceeds the ${WORD_MAX}-word limit.` });
+    return;
+  }
+  setState({ userDealContext: combined, ctxError: '' });
+}
+function updateCtxSatellites() {
+  const count = wordCount(state.userDealContext);
+  const counter = document.getElementById('ctx-word-count');
+  if (counter) {
+    counter.textContent = `${count} / ${WORD_MAX} words`;
+    counter.style.color = count >= WORD_MAX ? 'var(--error-ink)' : 'var(--ink-faint)';
+  }
+  const textarea = document.getElementById('ctx-textarea');
+  if (textarea && textarea.value !== state.userDealContext) textarea.value = state.userDealContext;
+}
+
+async function goToForecast() {
+  setState({ view: 'forecast', runState: 'starting', sweepForecast: null, classifyForecast: null, readyChecked: false, confirmId: null });
+  try {
+    const r = await adapter.startRun({
+      kind: 'run',
+      quarter: state.selectedQuarter,
+      min_usd: state.minUsd,
+      user_deal_context: state.userDealContext || null,
+    });
+    setState({ runId: r.run_id, runKind: 'run' });
+    watchRun();
+  } catch (err) {
+    setState({ view: 'launch' });
+    showBanner('error', `Could not start the run: ${err.message}`);
+  }
+}
+
+function watchRun() {
+  if (eventsHandle) eventsHandle.close();
+  eventsHandle = adapter.streamRunEvents(0, handleRunEvent);
+}
+
+/** Rebuild the live view for a run that was already in flight when the page
+ * loaded (v2 §5's refresh-mid-run replay). Reset the per-run state, mark the
+ * reattach in progress, land on the process screen, and let the SSE buffer
+ * replay drive the rest (handleRunEvent's reattach block corrects the screen
+ * to forecast if the run turns out to be sitting at the money gate). */
+function reattachRun(run) {
+  setState({
+    reattaching: true,
+    runKind: run.kind,
+    runId: run.run_id,
+    runState: 'running',
+    view: 'process',
+    liveRows: [], tally: {}, phase: null, statusSnapshot: null,
+    sweepForecast: null, classifyForecast: null, phase0Stats: null,
+    confirmId: null, readyChecked: false,
+  });
+  watchRun();
+}
+
+function handleRunEvent(event) {
+  const p = event.payload;
+  // Refresh-mid-run reattach only: GET /api/state tells us a run is active and
+  // its kind, but not whether it's at the money gate or already past it. Infer
+  // the screen from the replayed events (processed in seq order, last wins): a
+  // pending confirm ⇒ forecast, live progress ⇒ process. Isolated behind
+  // `reattaching` (cleared on the operator's first action / any terminal
+  // state) so the normal forward flow never has its view second-guessed.
+  if (state.reattaching) {
+    if (event.type === 'confirm_request') {
+      if (state.view !== 'forecast') pokeState({ view: 'forecast' });
+    } else if (event.type === 'status' || event.type === 'row' ||
+               (event.type === 'data' && p.kind === 'phase')) {
+      if (state.view !== 'process') pokeState({ view: 'process' });
+    }
+  }
+  switch (event.type) {
+    case 'run_state':
+      setState({ runState: p.state, runMessage: p.message || '' });
+      if (p.state === 'done' || p.state === 'declined' || p.state === 'interrupted' || p.state === 'error') {
+        pokeState({ reattaching: false });
+        const onLiveScreen = state.view === 'process' || state.view === 'forecast';
+        if ((state.runKind === 'run' || state.runKind === 'recover') && p.state === 'done') {
+          // Always load results; only force-navigate to Output if the operator is
+          // still on a live screen — don't yank them out of Settings/Guide/etc.
+          void adapter.getResults().then((r) => setState(
+            onLiveScreen
+              ? { summary: r.summary, artifacts: r.artifacts, view: 'output' }
+              : { summary: r.summary, artifacts: r.artifacts }
+          ));
+          if (!onLiveScreen) showBanner('info', 'Run complete — open Output to download the workbook.');
+        } else if (state.runKind === 'deal-profile' && p.state === 'done') {
+          // This UI never starts a standalone deal-profile build (the Q2 flow's
+          // single run builds the profile internally). This branch only fires
+          // for a reattach to a deal-profile run started elsewhere (e.g. the
+          // CLI) while the page was loading: cmd_deal_profile emits no
+          // phase/'done' data events, so without it the process screen would sit
+          // with the Stop button forever. Report success + refresh the quarters.
+          setState({ view: 'launch' });
+          refreshQuarters();
+          showBanner('info', 'Deal profile built.');
+        } else if (p.state === 'declined' || p.state === 'interrupted') {
+          // stay on the current screen; the banner below explains what happened
+          showBanner(p.state === 'interrupted' ? 'warn' : 'info', p.state === 'interrupted'
+            ? 'Stopped — in-flight batches finished; whatever was already decided is durable.'
+            : 'Declined — no paid call was made.');
+        } else if (p.state === 'error') {
+          showBanner('error', p.message || 'The run failed.');
+        }
+      }
+      break;
+    case 'data':
+      if (p.kind === 'sweep_forecast') setState({ sweepForecast: p.payload });
+      else if (p.kind === 'classify_forecast') setState({ classifyForecast: p.payload });
+      else if (p.kind === 'phase0_stats') setState({ phase0Stats: p.payload });
+      else if (p.kind === 'phase') setState({ phase: p.payload.phase });
+      break;
+    case 'status':
+      setState({ statusSnapshot: p.snapshot || null });
+      break;
+    case 'row': {
+      const rows = [p, ...state.liveRows].slice(0, 12);
+      const tally = { ...state.tally };
+      tally[p.classification] = (tally[p.classification] || 0) + 1;
+      setState({ liveRows: rows, tally });
+      break;
+    }
+    case 'confirm_request':
+      setState({ confirmId: p.confirm_id, confirmPrompt: p.prompt, runState: 'awaiting_confirm' });
+      break;
+    case 'info':
+      // Live feedback (run_manager emits an 'info' event on Stop). Surfacing its
+      // message makes process.js's "stopping…" banner appear the moment Stop is
+      // clicked, instead of only when the run reaches the terminal 'interrupted'.
+      if (p.msg) setState({ runMessage: p.msg });
+      break;
+    default:
+      break;
+  }
+}
+
+// ---------------------------------------------------------------------
+// Event delegation — the ONE place DOM events turn into action calls.
+// ---------------------------------------------------------------------
+
+function dispatch(actionName, event, el) {
+  const fn = actions[actionName];
+  if (typeof fn === 'function') fn(event, el.dataset);
+}
+
+root.addEventListener('click', (event) => {
+  const el = event.target.closest('[data-action]');
+  if (el) dispatch(el.dataset.action, event, el);
+});
+root.addEventListener('change', (event) => {
+  const el = event.target.closest('[data-onchange]');
+  if (el) dispatch(el.dataset.onchange, event, el);
+});
+root.addEventListener('input', (event) => {
+  const el = event.target.closest('[data-oninput]');
+  if (el) dispatch(el.dataset.oninput, event, el);
+});
+root.addEventListener('drop', (event) => {
+  const el = event.target.closest('[data-ondrop]');
+  if (el) dispatch(el.dataset.ondrop, event, el);
+});
+root.addEventListener('dragover', (event) => {
+  const el = event.target.closest('[data-ondragover]');
+  if (el) dispatch(el.dataset.ondragover, event, el);
+});
+root.addEventListener('dragenter', (event) => {
+  const el = event.target.closest('[data-ondragenter]');
+  if (el) dispatch(el.dataset.ondragenter, event, el);
+});
+root.addEventListener('dragleave', (event) => {
+  const el = event.target.closest('[data-ondragleave]');
+  if (el) dispatch(el.dataset.ondragleave, event, el);
+});
+// Wheel/mousemove drive the hero's "scroll or hover to enter" gesture.
+root.addEventListener('wheel', (event) => { if (event.deltaY > 0) actions.enterMain(); }, { passive: true });
+root.addEventListener('mousemove', () => actions.enterMain(), { once: true });
+// Escape closes an open modal (a11y — modals also carry role="dialog"/aria-modal).
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  if (state.ctxOpen) actions.closeCtx();
+  else if (state.configOpen) actions.closeConfig();
+});
+
+// ---------------------------------------------------------------------
+// Render
+// ---------------------------------------------------------------------
+
+function screenFor(view) {
+  return {
+    main: heroValidation,
+    launch: launch,
+    forecast: forecast,
+    process: process_,
+    output: output,
+    settings: settings,
+    guide: guide,
+  }[view] || heroValidation;
+}
+
+function render() {
+  // Terminal: once the server has idle-timed-out there's nothing left to talk
+  // to, so replace the whole app with the calm "session timed out" notice
+  // rather than let stale screens throw failed requests at a dead server.
+  if (state.sessionTimedOut) {
+    root.innerHTML = timeout_.render(state);
+    return;
+  }
+
+  const screen = screenFor(state.view);
+  const bannerHtml = state.banner ? `
+    <div class="banner banner--${state.banner.kind}" role="alert">
+      <span>${escapeHtml(state.banner.text)}</span>
+      <button data-action="dismissBanner" class="icon-btn" style="color:inherit" aria-label="Dismiss">&times;</button>
+    </div>` : '';
+
+  root.innerHTML = `
+    ${heroValidation.renderHero(state)}
+    <div class="header-bar">
+      <button data-action="goHome" class="header-logo" aria-label="Home" style="background:transparent;border:none;padding:0">
+        <img src="gnl-logo-stacked.png" alt="Global Net Lease" style="height:46px;width:auto;filter:brightness(0) invert(1)">
+      </button>
+      <div class="header-actions">
+        <button data-action="openGuide" class="header-link-btn">Guide</button>
+        <button data-action="openSettings" class="icon-btn" aria-label="Settings">${ICON_GEAR_HEADER}</button>
+      </div>
+    </div>
+    <div style="width:100%;max-width:1000px;padding:0 24px;margin-top:14px">${bannerHtml}</div>
+    ${screen.render(state)}
+    ${state.configOpen ? configModal.render(state) : ''}
+    ${state.ctxOpen ? contextModal.render(state) : ''}
+  `;
+
+  if (state.ctxOpen) updateCtxSatellites();
+  if (typeof screen.afterRender === 'function') screen.afterRender(state);
+}
+
+const ICON_GEAR_HEADER = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+
+// escapeHtml now lives in ./screens/escape.js (single source, shared with the
+// screen modules); re-exported here so any existing importer of it is unaffected.
+export { escapeHtml };
+
+// ---------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------
+
+// Liveness ping — detect that the local server has idle-timed-out and shut
+// itself down (gna_server/lifecycle.py, ~15 min of no activity), and show the
+// calm "session timed out" screen instead of letting the next click fail.
+//
+// This polls /api/ping, which is DELIBERATELY exempt from the server's
+// activity tracker (gna_server/app.py's _LIVENESS_PATHS) — so polling it does
+// NOT keep the server alive and an open-but-idle tab still times out as
+// intended. Genuine actions (uploads, configuring, running, downloading) hit
+// normal endpoints that DO count as activity, so active use never times out.
+// Two consecutive misses trip the screen (a single blip won't); once the
+// server is truly gone the connection is refused immediately. A live server
+// resets the counter.
+const PING_MS = 20000;
+let pingFails = 0;
+let pingTimer = null;
+
+async function pingLiveness() {
+  try {
+    const res = await fetch('/api/ping', { cache: 'no-store' });
+    pingFails = res.ok ? 0 : pingFails + 1;
+  } catch (_e) {
+    pingFails += 1; // connection refused once the server has stopped
+  }
+  if (pingFails >= 2) {
+    if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+    if (!state.sessionTimedOut) setState({ sessionTimedOut: true });
+  }
+}
+pingTimer = setInterval(pingLiveness, PING_MS);
+
+// Keep-alive beacon — genuine on-screen activity must prevent a timeout, even
+// when it makes no server request on its own: moving the mouse, typing in
+// Additional Context, clicking tabs, scrolling while reading. We watch those
+// DOM interactions and, at most once per BEACON_MS, tell the server "still
+// here" (GET /api/activity resets the idle clock server-side). We stay SILENT
+// when there's been no interaction since the last beacon, so a walked-away tab
+// still idles out and shows the timeout screen. (Date.now here is ordinary
+// browser JS.)
+const BEACON_MS = 25000;
+let lastInteraction = Date.now();
+let lastBeacon = Date.now();
+const markInteraction = () => { lastInteraction = Date.now(); };
+// capture:true so a scroll inside the results table (scroll doesn't bubble to
+// window) or an event some handler stops still registers as activity.
+['mousemove', 'mousedown', 'keydown', 'wheel', 'scroll', 'touchstart', 'input']
+  .forEach((evt) => window.addEventListener(evt, markInteraction, { passive: true, capture: true }));
+setInterval(() => {
+  if (state.sessionTimedOut) return;
+  if (lastInteraction > lastBeacon) {
+    lastBeacon = Date.now();
+    fetch('/api/activity', { cache: 'no-store' }).catch(() => {});
+  }
+}, BEACON_MS);
+
+(async function boot() {
+  render();
+  void refreshGraphStatus();
+  try {
+    const s = await refreshServerState();
+    if (s.run && s.run.active) {
+      reattachRun(s.run); // page was refreshed mid-run — rebuild the live view
+    } else {
+      render();
+    }
+  } catch (err) {
+    showBanner('error', `Could not reach the server: ${err.message}`);
+  }
+})();

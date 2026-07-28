@@ -1,0 +1,33 @@
+# tests/token_extraction_cases.txt — invoice_mining regression cases (v3_02 §4.1)
+# format: raw_descrptn_text => expected_normalized_key_or_NONE
+# run: gna_pipeline.invoice_mining.run_regression(this_file)
+
+# Gold example from the spec: INV-prefixed token embedded mid-sentence.
+Deloitte INV8006811344 dated 1 => 8006811344
+
+# MRI space-pads a leading invoice code before the free-text description.
+6757459         Womble - Project => 6757459
+
+# INV-prefix separator variants: '#', '-', ':'.
+Payment INV#4471 for services => 4471
+Ref INV-778820 processed => 778820
+Note INV:55219 pending => 55219
+
+# Slash-bearing token after an INV prefix; normalize() drops the slash.
+Invoice INV-4471/A on file => 4471A
+
+# Standalone alnum run >=5 chars next to vendor-ish (alphabetic) text.
+Vendor Acme 84512 payment approved => 84512
+
+# Date-shaped candidate must NOT be treated as an invoice key.
+Payment due 10/18/24 balance => NONE
+
+# Short run (<5 chars) must NOT match.
+Order ID 123 confirmed => NONE
+
+# Digit-free tokens are never invoice keys — hyphenated words like
+# 'Multi-Tenant' slipped past the old isalpha() reject and were mined as
+# MULTITENANT, flagging had_invoice on plain bank-fee rows (2026-07-07 run).
+Multi-Tenant Loan IV => NONE
+Bank Fee => NONE
+Year-End True-Up adjustment => NONE
