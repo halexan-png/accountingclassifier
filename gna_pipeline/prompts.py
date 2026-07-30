@@ -326,7 +326,7 @@ CLASSIFY_ROWS_TOOL: dict[str, Any] = {
 
 # ---------------------------------------------------------------------------
 # build_deal_profile tool — Phase 1 forced tool. The model returns raw
-# evidence only; supporting_rows/strength/quarters are derived deterministically
+# evidence only; supporting_rows/quarters are derived deterministically
 # by deal_profile.run_sweep — never trust the model's own counts.
 # ---------------------------------------------------------------------------
 BUILD_DEAL_PROFILE_TOOL: dict[str, Any] = {
@@ -362,16 +362,6 @@ BUILD_DEAL_PROFILE_TOOL: dict[str, Any] = {
                         },
                         "name": {"type": "string"},
                         "aliases": {"type": "array", "items": {"type": "string"}},
-                        "type": {
-                            "type": "string",
-                            "enum": [
-                                "disposition",
-                                "acquisition",
-                                "merger",
-                                "financing",
-                                "unknown",
-                            ],
-                        },
                         "matter_numbers": {"type": "array", "items": {"type": "string"}},
                         "invoice_numbers": {"type": "array", "items": {"type": "string"}},
                         "properties": {"type": "array", "items": {"type": "string"}},
@@ -389,7 +379,6 @@ BUILD_DEAL_PROFILE_TOOL: dict[str, Any] = {
                         "evidence",
                         "name",
                         "aliases",
-                        "type",
                         "matter_numbers",
                         "invoice_numbers",
                         "properties",
@@ -688,12 +677,12 @@ def _deal_index_line(entry: dict[str, Any]) -> tuple[str, str]:
     other field) — every lookup is a best-effort .get.
 
     Only recognition identifiers are fed to the classifier: name, aliases,
-    matter#, inv#, properties. Deliberately NOT fed — type, entityids,
-    advisors_seen, and quarters ("seen"): they add variance/noise without
-    helping recognize a deal in a row's own text (an advisor/vendor match is
-    declared non-triggering, and type is only a Phase-1 guess). All of those
-    still live in quarter_deal_profile.json and the Deal Profile Excel tab for
-    humans; they are just not part of what the classifier sees.
+    matter#, inv#, properties. Deliberately NOT fed — entityids, advisors_seen,
+    and quarters ("seen"): they add variance/noise without helping recognize a
+    deal in a row's own text (an advisor/vendor match is declared
+    non-triggering). All of those still live in quarter_deal_profile.json and
+    the Deal Profile Excel tab for humans; they are just not part of what the
+    classifier sees.
 
     Returns (line, name_lead) — the second element is the bare "- {name}" lead,
     kept for the caller's tuple unpacking (a vestige of the old collapsed-line
@@ -723,7 +712,7 @@ def deal_profile_context_index(
     profile: dict[str, Any] | None,
 ) -> tuple[str, dict[str, Any]]:
     """Build the compact Phase-2 known-deal index: one line per known deal
-    (name/type/aliases/matter#/inv#/props/entities/advisors/seen). This replaces
+    (name/aliases/matter#/inv#/props/entities/advisors/seen). This replaces
     embedding the rich profile JSON in the prompt — the full evidence corpus
     stays in quarter_deal_profile.json and the Deal Profile Excel sheet for
     humans; the prompt only needs identifiers to recognize.

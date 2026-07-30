@@ -106,6 +106,17 @@ def closegl_guard_trips(packet: RowPacket) -> bool:
     return bool(_CLOSEGL_GUARD_DESC_RE.search(descrptn))
 
 
+def _is_substantive_reference(value: str) -> bool:
+    """True when a raw invoice reference (invoice_url text, or a mined
+    invoice key) has at least config.MIN_SUBSTANTIVE_REFERENCE_CHARS
+    alphanumeric characters. A shorter one ("123", "a51") is noise, not a
+    real pointer to a document — it must never be fetched/retried, and a
+    failed lookup against one must never count toward invoice_read_failed
+    (which is the honest "we had a real invoice and could not read it"
+    total shown to the operator)."""
+    return sum(1 for ch in value if ch.isalnum()) >= config.MIN_SUBSTANTIVE_REFERENCE_CHARS
+
+
 class Phase0Stats(TypedDict):
     reclass_fired: int
     closegl_fired: int
@@ -115,6 +126,7 @@ class Phase0Stats(TypedDict):
     had_invoice_yes: int
     invoice_accessed_yes: int
     invoice_unavailable: int
+    invoice_read_failed: int
     url_fetched_ok: int
     url_fetch_failed: int
     local_resolved: int
@@ -134,6 +146,7 @@ def _empty_stats() -> Phase0Stats:
         had_invoice_yes=0,
         invoice_accessed_yes=0,
         invoice_unavailable=0,
+        invoice_read_failed=0,
         url_fetched_ok=0,
         url_fetch_failed=0,
         local_resolved=0,
@@ -336,10 +349,16 @@ def prepare_rows(
             stats["errors"] += 1
 
     # --- Pass B: concurrent URL prefetch, dedup'd by URL --------------------
+    # A non-substantive invoice_url ("123", "a51") is never a real link — skip
+    # it here so it never reaches the network/retry loop; Pass C below
+    # synthesizes a "reference_too_short" result for it instead.
     url_results: dict[str, InvoiceResult] = {}
     if fetch_urls:
         unique_urls = sorted(
-            {p["invoice_url"] for p, _flags in pending if p.get("invoice_url")}
+            {
+                p["invoice_url"] for p, _flags in pending
+                if p.get("invoice_url") and _is_substantive_reference(p["invoice_url"])
+            }
         )
         if unique_urls:
             with ThreadPoolExecutor(max_workers=url_workers) as pool:
@@ -361,9 +380,17 @@ def prepare_rows(
                 # Priority source: a scannedcopyurl IS the invoice. Never
                 # falls back to local resolution for a URL-bearing row.
                 if fetch_urls:
-                    result = url_results.get(invoice_url) or invoice_read.fetch_invoice_url(
-                        invoice_url
-                    )
+                    substantive_url = _is_substantive_reference(invoice_url)
+                    if substantive_url:
+                        result = url_results.get(invoice_url) or invoice_read.fetch_invoice_url(
+                            invoice_url
+                        )
+                    else:
+                        # Too short to be a real link ("123", "a51") — never
+                        # fetched/retried over the network (see Pass B above).
+                        result = invoice_read.unavailable_invoice(
+                            "url", invoice_url, "reference_too_short"
+                        )
                     if result.get("kind") in ("pdf", "text"):
                         had_invoice = "yes"
                         invoice_accessed = "yes"
@@ -383,6 +410,11 @@ def prepare_rows(
                         est = estimate_row_tokens(packet)
                         stats["url_fetch_failed"] += 1
                         stats["invoice_unavailable"] += 1
+                        # invoice_read_failed excludes the too-short/noise
+                        # references above — it's the operator-facing count of
+                        # rows that had a REAL invoice reference we couldn't read.
+                        if substantive_url:
+                            stats["invoice_read_failed"] += 1
                 else:
                     # --fetch-urls=False: charge a placeholder cost for
                     # batching honesty; never a real fetch, never
@@ -432,6 +464,8 @@ def prepare_rows(
                             row_hash = compute_row_hash(packet)
                             est = estimate_row_tokens(packet)
                             stats["invoice_unavailable"] += 1
+                            if _is_substantive_reference(mined_key):
+                                stats["invoice_read_failed"] += 1
                     else:
                         if status == "no_match":
                             stats["local_no_match"] += 1
@@ -445,6 +479,8 @@ def prepare_rows(
                         row_hash = compute_row_hash(packet)
                         est = estimate_row_tokens(packet)
                         stats["invoice_unavailable"] += 1
+                        if _is_substantive_reference(mined_key):
+                            stats["invoice_read_failed"] += 1
 
             if had_invoice == "yes":
                 stats["had_invoice_yes"] += 1
@@ -480,7 +516,7 @@ def prepare_rows(
     logger.info(
         "phase0 complete: reclass=%d closegl=%d guard_trips=%d negatives=%d "
         "to_classify=%d errors=%d had_invoice=%d invoice_accessed=%d "
-        "invoice_unavailable=%d",
+        "invoice_unavailable=%d invoice_read_failed=%d",
         stats["reclass_fired"],
         stats["closegl_fired"],
         stats["closegl_guard_trips"],
@@ -490,5 +526,6 @@ def prepare_rows(
         stats["had_invoice_yes"],
         stats["invoice_accessed_yes"],
         stats["invoice_unavailable"],
+        stats["invoice_read_failed"],
     )
     return stats

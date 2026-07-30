@@ -286,6 +286,14 @@ def _fetch_invoice_url(url: str) -> InvoiceResult:
     if not url or url.strip().lower() in ("none", ""):
         return null_invoice()
 
+    # Fewer than config.MIN_SUBSTANTIVE_REFERENCE_CHARS alphanumeric chars
+    # ("123", "a51") is noise, not a real link — fail fast, no transport
+    # attempt and no retry/backoff loop below. This guard lives here (not
+    # just at the prep.py call site) so ANY caller of fetch_invoice_url gets
+    # the same fail-fast behavior on a too-short reference.
+    if sum(1 for ch in url if ch.isalnum()) < config.MIN_SUBSTANTIVE_REFERENCE_CHARS:
+        return _error_result("url", url, "reference_too_short")
+
     # OneDrive/SharePoint links: an anonymous GET on these returns a login
     # page, not the file (see html_response_possible_login_or_expired_url
     # below) — Graph is the only way to actually read them. A missing token

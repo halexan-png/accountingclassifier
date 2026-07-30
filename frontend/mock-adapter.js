@@ -108,7 +108,7 @@ class MockRunEngine {
     this.emit('kv', { pairs: [['rows ingested', '11814']] });
     this.emit('section', { title: 'Phase 0: prep + invoices' });
     await delay(300);
-    const phase0 = { reclass_fired: 3, closegl_fired: 1, negatives_skipped: 2, resumed: 0, had_invoice_yes: 180, invoice_accessed_yes: 150, invoice_unavailable: 30, errors: 0 };
+    const phase0 = { reclass_fired: 3, closegl_fired: 1, negatives_skipped: 2, resumed: 0, had_invoice_yes: 180, invoice_accessed_yes: 150, invoice_unavailable: 30, invoice_read_failed: 24, errors: 0 };
     this.emit('data', { kind: 'phase0_stats', payload: phase0 });
 
     this.emit('section', { title: 'Forecast' });

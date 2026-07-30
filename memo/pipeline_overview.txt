@@ -1,0 +1,29 @@
+What happens when you run this
+
+You give it your two source workbooks. They get combined into one list of
+rows to work through.
+
+Before anything else, rows that represent a company acquisition or sale are
+pulled out and looked at first. These build a reference list of known deals
+that gets used later, and this list carries over between runs instead of
+starting over each time.
+
+Every other row is then given a decision: recurring cost, non-recurring
+cost, or needs a person to review it. The reference list of known deals,
+plus any extra notes you've provided, is used to inform every decision.
+Rows that have a usable invoice are looked at one at a time, including the
+invoice's contents. Rows without a usable invoice are grouped together and
+processed in batches, since there's no invoice content to worry about
+mixing up.
+
+The result is one Excel file containing:
+- Every original row, with the decision, the reasoning behind it,
+  supporting evidence, and the invoice's read status added on.
+- A separate sheet listing only the rows worth a person's attention
+  (anything flagged as non-recurring or needing review), grouped by vendor,
+  with totals. Acquisition/sale rows are left out of this sheet since those
+  are decided by fixed rule, not judgment.
+- A separate sheet showing the reference list of known deals that was
+  actually used to make decisions, so you can see what the reasoning was
+  based on.
+- A summary sheet with overall counts and cost.

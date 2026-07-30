@@ -261,6 +261,12 @@ INVOICE_RETRIES = 1                   # transport-level retries with backoff
 PAGE_FULL_READ_MAX = 20   # read every page when the window is <= this many pages
 PAGE_EDGE_COUNT    = 2    # when the window is longer, read only the first N + last N
 
+# A raw invoice_url/mined-key reference with fewer than this many
+# alphanumeric characters (e.g. "123", "a51") is noise, not a real pointer —
+# see prep._is_substantive_reference. Never fetched/retried, never counted
+# as a genuine invoice_read_failed.
+MIN_SUBSTANTIVE_REFERENCE_CHARS = 4
+
 # ---------------------------------------------------------------------------
 # Microsoft Graph (OneDrive/SharePoint invoice links) — OPTIONAL. An
 # invoice_url pointing at OneDrive/SharePoint can't be fetched anonymously

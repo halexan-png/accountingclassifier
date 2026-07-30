@@ -65,8 +65,6 @@ DEAL_PROFILE_SHEET = "Deal Profile"
 # One row per deal entry in the "Deal Profile" sheet, in this column order.
 _DEAL_PROFILE_COLUMNS: tuple[str, ...] = (
     "name",
-    "type",
-    "strength",
     "supporting_rows",
     "matter_numbers",
     "invoice_numbers",
@@ -77,7 +75,7 @@ _DEAL_PROFILE_COLUMNS: tuple[str, ...] = (
     "advisors_seen",
     "evidence",
 )
-_DEAL_PROFILE_COLUMN_WIDTHS: tuple[int, ...] = (28, 12, 10, 14, 18, 18, 16, 24, 28, 18, 28, 80)
+_DEAL_PROFILE_COLUMN_WIDTHS: tuple[int, ...] = (28, 14, 18, 18, 16, 24, 28, 18, 28, 80)
 _EXCEL_CELL_MAX_CHARS = 32_000  # Excel's hard cell limit is 32,767
 
 _FILL_NON_RECURRING = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
@@ -304,17 +302,15 @@ def _write_deal_profile_sheet(wb, deal_profile: dict) -> None:
 
     for row, entry in enumerate(deal_profile.get("entries", []), start=header_row + 1):
         ws.cell(row=row, column=1, value=entry.get("name", ""))
-        ws.cell(row=row, column=2, value=entry.get("type", ""))
-        ws.cell(row=row, column=3, value=entry.get("strength", ""))
-        ws.cell(row=row, column=4, value=entry.get("supporting_rows", 0))
-        ws.cell(row=row, column=5, value=_join_list(entry.get("matter_numbers")))
-        ws.cell(row=row, column=6, value=_join_list(entry.get("invoice_numbers")))
-        ws.cell(row=row, column=7, value=_join_list(entry.get("quarters")))
-        ws.cell(row=row, column=8, value=_join_list(entry.get("aliases")))
-        ws.cell(row=row, column=9, value=_join_list(entry.get("properties")))
-        ws.cell(row=row, column=10, value=_join_list(entry.get("entityids")))
-        ws.cell(row=row, column=11, value=_join_list(entry.get("advisors_seen")))
-        ws.cell(row=row, column=12, value=_evidence_text(entry.get("evidence")))
+        ws.cell(row=row, column=2, value=entry.get("supporting_rows", 0))
+        ws.cell(row=row, column=3, value=_join_list(entry.get("matter_numbers")))
+        ws.cell(row=row, column=4, value=_join_list(entry.get("invoice_numbers")))
+        ws.cell(row=row, column=5, value=_join_list(entry.get("quarters")))
+        ws.cell(row=row, column=6, value=_join_list(entry.get("aliases")))
+        ws.cell(row=row, column=7, value=_join_list(entry.get("properties")))
+        ws.cell(row=row, column=8, value=_join_list(entry.get("entityids")))
+        ws.cell(row=row, column=9, value=_join_list(entry.get("advisors_seen")))
+        ws.cell(row=row, column=10, value=_evidence_text(entry.get("evidence")))
 
     for i, width in enumerate(_DEAL_PROFILE_COLUMN_WIDTHS, start=1):
         ws.column_dimensions[get_column_letter(i)].width = width

@@ -494,6 +494,102 @@ def test_non_reclass_row_is_unaffected():
 
 
 # ---------------------------------------------------------------------------
+# invoice_read_failed: a reference with <4 alnum chars ("123", "a51") is
+# noise, not a real pointer -- never fetched/retried, never counted as a
+# genuine read failure (see prep._is_substantive_reference).
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("123", False),
+        ("a51", False),
+        ("a512", True),
+        ("1234", True),
+        ("http://example.com/invoice.pdf", True),
+    ],
+)
+def test_is_substantive_reference(value, expected):
+    assert prep._is_substantive_reference(value) is expected
+
+
+def test_fetch_invoice_url_fails_fast_on_short_reference_no_network():
+    """invoice_read.fetch_invoice_url itself short-circuits a <4-char
+    reference before any transport attempt/retry loop -- defense in depth
+    beyond prep.py's own bypass, so any caller gets the same fail-fast
+    behavior. No network mocking needed: a real call must return instantly."""
+    result = invoice_read.fetch_invoice_url("123")
+    assert result["kind"] == "error"
+    assert result["error"] == "reference_too_short"
+
+
+def test_short_invoice_url_never_fetched_and_excluded_from_read_failed(monkeypatch):
+    """A <4-char invoice_url must never reach the network/retry loop, and its
+    (still-recorded) invoice_unavailable outcome must not inflate
+    invoice_read_failed."""
+    def _boom(url):
+        raise AssertionError("fetch_invoice_url must not be called for a too-short reference")
+    monkeypatch.setattr(prep.invoice_read, "fetch_invoice_url", _boom)
+
+    stats = prep.prepare_rows(
+        [_packet(invoice_url="123")], lookup_index={},
+        emit=lambda r: None, fetch_urls=True,
+    )
+    item = stats["work_items"][0]
+    assert item["had_invoice"] == "yes"
+    assert item["invoice_accessed"] == "no"
+    assert "invoice_unavailable" in item["flags"]  # M&A tab column unaffected
+    assert stats["invoice_unavailable"] == 1
+    assert stats["invoice_read_failed"] == 0
+
+
+def test_substantive_invoice_url_fetch_failure_counts_as_read_failed(monkeypatch):
+    """A real (>=4 char) URL that fails to fetch counts toward both the
+    existing invoice_unavailable tally and the new invoice_read_failed one."""
+    def _fail(url):
+        return invoice_read.unavailable_invoice("url", url, "fetch_failed: boom")
+    monkeypatch.setattr(prep.invoice_read, "fetch_invoice_url", _fail)
+
+    stats = prep.prepare_rows(
+        [_packet(invoice_url="http://example.com/invoice.pdf")], lookup_index={},
+        emit=lambda r: None, fetch_urls=True,
+    )
+    item = stats["work_items"][0]
+    assert item["invoice_accessed"] == "no"
+    assert stats["invoice_unavailable"] == 1
+    assert stats["invoice_read_failed"] == 1
+
+
+def test_short_mined_key_local_no_match_excluded_from_read_failed(monkeypatch, tmp_path):
+    """Same accounting rule on the local-lookup path (defense in depth --
+    mine_invoice_key's own regexes already floor keys at 4 chars, so this
+    only fires if that ever changes)."""
+    monkeypatch.setattr(prep.invoice_mining, "mine_invoice_key", lambda packet: ("A1B", False))
+    monkeypatch.setattr(prep.config, "INVOICE_DIR", tmp_path)
+
+    stats = prep.prepare_rows(
+        [_packet(invoice_url=None)], lookup_index={},
+        emit=lambda r: None, fetch_urls=True,
+    )
+    assert stats["local_no_match"] == 1
+    assert stats["invoice_unavailable"] == 1
+    assert stats["invoice_read_failed"] == 0
+
+
+def test_substantive_mined_key_local_no_match_counts_as_read_failed(monkeypatch, tmp_path):
+    monkeypatch.setattr(prep.invoice_mining, "mine_invoice_key", lambda packet: ("A1B2C", False))
+    monkeypatch.setattr(prep.config, "INVOICE_DIR", tmp_path)
+
+    stats = prep.prepare_rows(
+        [_packet(invoice_url=None)], lookup_index={},
+        emit=lambda r: None, fetch_urls=True,
+    )
+    assert stats["local_no_match"] == 1
+    assert stats["invoice_unavailable"] == 1
+    assert stats["invoice_read_failed"] == 1
+
+
+# ---------------------------------------------------------------------------
 # 5: invoice-token mining golden table
 # ---------------------------------------------------------------------------
 

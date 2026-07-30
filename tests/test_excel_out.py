@@ -21,7 +21,6 @@ def _profile(evidence_count: int = 5) -> dict:
             {
                 "name": "Project Alpha",
                 "aliases": ["Alpha"],
-                "type": "acquisition",
                 "properties": ["123 Main St"],
                 "entityids": ["E1"],
                 "advisors_seen": ["Firm LLP"],
@@ -30,7 +29,6 @@ def _profile(evidence_count: int = 5) -> dict:
                     for i in range(evidence_count)
                 ],
                 "supporting_rows": evidence_count,
-                "strength": "normal",
             }
         ],
     }

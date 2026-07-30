@@ -181,6 +181,7 @@ def print_phase0_stats(stats0: prep.Phase0Stats) -> None:
         ("had_invoice_yes", str(stats0["had_invoice_yes"])),
         ("invoice_accessed_yes", str(stats0["invoice_accessed_yes"])),
         ("invoice_unavailable", str(stats0["invoice_unavailable"])),
+        ("invoice_read_failed", str(stats0["invoice_read_failed"])),
         ("url_fetched_ok", str(stats0["url_fetched_ok"])),
         ("url_fetch_failed", str(stats0["url_fetch_failed"])),
         ("local_resolved", str(stats0["local_resolved"])),

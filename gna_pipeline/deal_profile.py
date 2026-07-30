@@ -24,7 +24,7 @@ Every completed batch is followed by an incremental save of the profile JSON
 instant its (sub-)batch resolves, so a KeyboardInterrupt mid-sweep loses no
 already-decided row. The model only ever returns forced-tool structured
 output (BUILD_DEAL_PROFILE_TOOL); all validation, coercion, and
-derived-field computation (strength, quarters) is deterministic Python
+derived-field computation (quarters) is deterministic Python
 here — the AI never writes a file.
 
 The sweep runs concurrently through the same warmup + bounded-pool +
@@ -569,7 +569,6 @@ def _merge_entry(entries_acc: dict[str, dict[str, Any]], key: str, data: dict[st
         entries_acc[key] = {
             "name": data["name"],
             "aliases": list(data.get("aliases") or []),
-            "type": data.get("type") or "unknown",
             "matter_numbers": list(data.get("matter_numbers") or []),
             "invoice_numbers": list(data.get("invoice_numbers") or []),
             "properties": list(data.get("properties") or []),
@@ -611,7 +610,6 @@ def _fold_existing_entry(entries_acc: dict[str, dict[str, Any]], entry: dict[str
         {
             "name": name,
             "aliases": entry.get("aliases") or [],
-            "type": entry.get("type") or "unknown",
             "matter_numbers": entry.get("matter_numbers") or [],
             "invoice_numbers": entry.get("invoice_numbers") or [],
             "properties": entry.get("properties") or [],
@@ -656,7 +654,6 @@ def _coerce_and_merge_entry(
         {
             "name": name,
             "aliases": _str_list(raw_entry.get("aliases")),
-            "type": raw_entry.get("type") if isinstance(raw_entry.get("type"), str) else "unknown",
             "matter_numbers": _str_list(raw_entry.get("matter_numbers")),
             "invoice_numbers": _str_list(raw_entry.get("invoice_numbers")),
             "properties": _str_list(raw_entry.get("properties")),
@@ -671,8 +668,8 @@ def _coerce_and_merge_entry(
 def _derive_entries(
     entries_acc: dict[str, dict[str, Any]], row_period_map: dict[int, str | None]
 ) -> list[dict[str, Any]]:
-    """Recompute supporting_rows / strength / quarters post-merge (never
-    trust anything the model said about them)."""
+    """Recompute supporting_rows / quarters post-merge (never trust anything
+    the model said about them)."""
     final_entries: list[dict[str, Any]] = []
     for data in entries_acc.values():
         idxs = sorted({int(i) for i in data["supporting_row_idxs"]})
@@ -686,7 +683,6 @@ def _derive_entries(
             {
                 "name": data["name"],
                 "aliases": data["aliases"],
-                "type": data["type"],
                 "matter_numbers": data["matter_numbers"],
                 "invoice_numbers": data["invoice_numbers"],
                 "properties": data["properties"],
@@ -696,7 +692,6 @@ def _derive_entries(
                 "supporting_row_idxs": idxs,
                 "supporting_rows": supporting_rows,
                 "quarters": sorted(quarters),
-                "strength": "weak" if supporting_rows < 3 else "normal",
             }
         )
     return final_entries

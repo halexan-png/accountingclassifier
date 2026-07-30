@@ -49,7 +49,7 @@ export function render(state) {
 
   const phase0 = state.phase0Stats;
   const invoiceBanner = phase0 ? `
-    <div class="banner banner--info">Invoices: ${phase0.invoice_accessed_yes || 0} accessed, ${phase0.invoice_unavailable || 0} unavailable of ${phase0.had_invoice_yes || 0} rows with an invoice</div>
+    <div class="banner banner--info">Invoices: ${phase0.invoice_accessed_yes || 0} read, ${phase0.invoice_read_failed || 0} failed to read of ${phase0.had_invoice_yes || 0} rows with an invoice</div>
   ` : '';
 
   const doneHtml = phase === 'done' ? `
