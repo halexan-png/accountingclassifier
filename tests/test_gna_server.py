@@ -384,6 +384,46 @@ def test_activity_beacon_resets_idle(client):
     assert lifecycle.seconds_since_activity() < 5.0
 
 
+def test_shutdown_refused_while_run_active(client, monkeypatch):
+    """A deliberate "Close application" (POST /api/shutdown) must never kill a
+    live (paid) run -- it returns 409 while a run is active, mirroring the idle
+    watchdog's own gate (gna_server/lifecycle.should_shut_down)."""
+    from gna_server import routes_lifecycle
+
+    monkeypatch.setattr(routes_lifecycle.manager, "is_active", lambda: True)
+    resp = client.post("/api/shutdown", json={})
+    assert resp.status_code == 409
+
+
+def test_shutdown_triggers_registered_exit_hook(client, monkeypatch):
+    """With no run active, POST /api/shutdown fires the registered exit hook --
+    the same should_exit flip __main__ wires for the watchdog -- and reports ok.
+    Pins that the manual close path actually reaches the shutdown mechanism."""
+    from gna_server import lifecycle, routes_lifecycle
+
+    monkeypatch.setattr(routes_lifecycle.manager, "is_active", lambda: False)
+    fired = {"n": 0}
+    lifecycle.register_exit(lambda: fired.__setitem__("n", fired["n"] + 1))
+    try:
+        resp = client.post("/api/shutdown", json={})
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True}
+        assert fired["n"] == 1
+    finally:
+        lifecycle.register_exit(None)  # never leak the hook into other tests
+
+
+def test_shutdown_without_exit_hook_is_503(client, monkeypatch):
+    """If no exit hook is registered (e.g. the TestClient here -- __main__.main()
+    never ran), shutdown reports 503 rather than pretend the server is closing."""
+    from gna_server import lifecycle, routes_lifecycle
+
+    monkeypatch.setattr(routes_lifecycle.manager, "is_active", lambda: False)
+    lifecycle.register_exit(None)
+    resp = client.post("/api/shutdown", json={})
+    assert resp.status_code == 503
+
+
 def test_run_without_workbook_is_400(client):
     resp = client.post("/api/run", json={"kind": "run", "quarter": "2026Q1"})
     assert resp.status_code == 400

@@ -89,6 +89,40 @@ def should_shut_down(*, timeout_s: float, idle_s: float, run_active: bool) -> bo
     return idle_s >= timeout_s
 
 
+# --------------------------------------------------------------------------
+# Shared exit hook. Both the idle watchdog (below) and a deliberate operator
+# "Close application" click (POST /api/shutdown -> routes_lifecycle.py) stop the
+# server the SAME way: flip uvicorn's Server.should_exit so it drains in-flight
+# requests and the process exits normally, which fires __main__'s atexit
+# temp-workspace cleanup. __main__.main() registers the hook once at startup;
+# anything wanting a graceful shutdown calls request_shutdown().
+# --------------------------------------------------------------------------
+
+_exit_lock = threading.Lock()
+_request_exit_cb: Callable[[], None] | None = None
+
+
+def register_exit(request_exit: Callable[[], None] | None) -> None:
+    """Record how to stop the running server (a callback that flips uvicorn's
+    should_exit). Called once from __main__; pass None to clear it (tests)."""
+    global _request_exit_cb
+    with _exit_lock:
+        _request_exit_cb = request_exit
+
+
+def request_shutdown() -> bool:
+    """Trigger a graceful shutdown via the registered exit hook. Returns True if
+    a hook was registered and invoked, False otherwise (e.g. under pytest's
+    TestClient, where there is no uvicorn Server to stop) -- callers surface
+    that honestly rather than pretend the server is going down."""
+    with _exit_lock:
+        cb = _request_exit_cb
+    if cb is None:
+        return False
+    cb()
+    return True
+
+
 def start_watchdog(
     request_exit: Callable[[], None],
     *,

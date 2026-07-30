@@ -29,3 +29,6 @@ export const ICON_WARNING = `<svg width="16" height="16" viewBox="0 0 24 24" fil
 export const ICON_ERROR = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="flex:none"><path d="M12 8v5M12 16.5v.3" stroke="#C0392B" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="12" r="9.2" stroke="#C0392B" stroke-width="1.6"/></svg>`;
 
 export const ICON_DONE_BIG = `<svg width="72" height="72" viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="27" fill="#E7F5EC" stroke="#1F9D55" stroke-width="2"/><path d="M21 33 L29 41 L44 24" fill="none" stroke="#1F9D55" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="40" stroke-dashoffset="40" style="animation:omDraw .5s .15s ease forwards"/></svg>`;
+
+// Power symbol for the Output screen's "Close application" button.
+export const ICON_POWER = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3v9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6.6 7a8 8 0 1 0 10.8 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;

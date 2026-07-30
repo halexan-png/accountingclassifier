@@ -22,7 +22,15 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import lifecycle, routes_graph, routes_readonly, routes_run, routes_settings, routes_upload
+from . import (
+    lifecycle,
+    routes_graph,
+    routes_lifecycle,
+    routes_readonly,
+    routes_run,
+    routes_settings,
+    routes_upload,
+)
 
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 _STATE_CHANGING_METHODS = ("POST", "PUT", "PATCH", "DELETE")
@@ -68,6 +76,7 @@ app.include_router(routes_upload.router)
 app.include_router(routes_readonly.router)
 app.include_router(routes_settings.router)
 app.include_router(routes_graph.router)
+app.include_router(routes_lifecycle.router)
 
 # Best-effort: Wave 1B (frontend/) may not exist yet when this app is
 # imported (e.g. under pytest, or before the frontend wave lands). Mounted

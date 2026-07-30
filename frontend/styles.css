@@ -363,6 +363,16 @@ img { max-width: 100%; }
 .modal-title { font-weight: 800; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-primary-alt); }
 .modal-close-btn { border: none; background: none; cursor: pointer; color: var(--ink-faint); display: flex; padding: 2px; }
 
+/* Compact confirm dialog (e.g. "Close the application?"). Narrower than the
+   820px config/context modals; must come AFTER .modal-panel so its width wins. */
+.modal-panel--confirm { width: 460px; padding: 28px 30px 24px; gap: 8px; }
+.modal-confirm-body { font-size: 14px; line-height: 1.6; color: var(--ink-secondary); margin: 8px 0 4px; }
+.modal-confirm-reminder {
+  display: flex; align-items: flex-start; gap: 10px; background: var(--warning-bg); color: var(--warning-ink-dark);
+  border-radius: var(--radius-sm); padding: 11px 14px; font-size: 12.5px; font-weight: 600; line-height: 1.45; margin: 6px 0 4px;
+}
+.modal-confirm-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+
 .config-columns { display: flex; gap: 20px; flex-wrap: wrap; }
 .config-col { flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 16px; padding: 24px; border-radius: var(--radius-md); background: var(--surface-well); border: 1px solid var(--line-1); }
 .config-col-title { font-weight: 800; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-primary-alt); }
@@ -452,6 +462,19 @@ img { max-width: 100%; }
 .file-chip { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-radius: var(--radius-sm); border: 1px solid var(--line-1); background: #fff; }
 .file-chip-name { font-weight: 600; font-size: 13px; color: var(--ink-primary-alt); }
 .file-chip-meta { font-weight: 500; font-size: 11px; color: var(--ink-faint); }
+
+/* Output-screen finish block: quiet "Back to launch" beside the deliberate
+   "Close application" (stops the local server — gna_server/routes_lifecycle.py). */
+.finish { padding-top: 20px; border-top: 1px dashed var(--line-5); display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.finish-note { margin: 0; text-align: center; font-size: 12.5px; line-height: 1.5; color: var(--ink-faint); max-width: 42ch; }
+.finish-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+/* Countdown shown while "Close application" is still locked (first 20s after the
+   download begins). app.js updates #close-hint's text in place each second. */
+.finish-lock { font-size: 11px; letter-spacing: .06em; color: var(--ink-faint); text-align: center; }
+/* Clearly-disabled look for the dark Close button while it's locked -- the base
+   .btn--dark stays dark, which would read as clickable. */
+.btn--dark:disabled { background: #E2E4E7; color: #A5A8AD; box-shadow: none; }
+.btn--dark:disabled:hover { transform: none; }
 
 /* ---------------------------------------------------------------------
    Settings / Guide

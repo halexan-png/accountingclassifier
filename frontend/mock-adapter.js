@@ -16,6 +16,7 @@
 //   streamRunEvents(afterSeq, onEvent) -> {close()}
 //   confirmRun(confirm_id, answer) -> {ok}
 //   cancelRun() -> {ok}
+//   shutdownApp() -> {ok}
 //   getResults() -> {summary, artifacts}
 //   downloadUrl(key) -> string (a Blob URL standing in for the real file)
 //   getDoc(key) -> {markdown}
@@ -288,6 +289,13 @@ export const adapter = {
   async cancelRun() {
     await delay(50);
     return { ok: currentRun ? currentRun.cancel() : false };
+  },
+
+  async shutdownApp() {
+    await delay(80);
+    // No real server to stop in mock mode -- just acknowledge so the offline UI
+    // can still demo the close-confirm and end screen.
+    return { ok: true };
   },
 
   async getResults() {

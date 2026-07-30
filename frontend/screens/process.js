@@ -20,6 +20,18 @@ function formatEta(seconds) {
   return minutes < 1 ? '<1m' : `~${Math.round(minutes)}m`;
 }
 
+// Exported so app.js's SSE 'row' handler can patch #live-rows directly
+// instead of going through setState() -- a full re-render on every classified
+// row would rebuild the whole screen and replay .main-view's entrance
+// animation each time (see app.js's handleRunEvent).
+export function renderRow(r) {
+  return `
+    <div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-secondary-alt);border-bottom:1px solid var(--line-3);padding:4px 0">
+      <span>row ${r.row_idx} · ${escapeHtml(r.acctnum)}</span>
+      <span>${escapeHtml(r.classification)}</span>
+    </div>`;
+}
+
 export function render(state) {
   const phase = state.phase;
   const snap = state.statusSnapshot;
@@ -49,12 +61,8 @@ export function render(state) {
   ` : '';
 
   const rowsHtml = state.liveRows.length ? `
-    <div style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto">
-      ${state.liveRows.map((r) => `
-        <div style="display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-secondary-alt);border-bottom:1px solid var(--line-3);padding:4px 0">
-          <span>row ${r.row_idx} · ${escapeHtml(r.acctnum)}</span>
-          <span>${escapeHtml(r.classification)}</span>
-        </div>`).join('')}
+    <div id="live-rows" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto">
+      ${state.liveRows.map(renderRow).join('')}
     </div>
   ` : '';
 

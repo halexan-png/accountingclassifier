@@ -10,7 +10,7 @@
 // HANDOFF_2_server.md's Deviation section), so this is the one reliable
 // source of truth for a recover-triggered run too.
 
-import { ICON_EXCEL_SM, ICON_DONE_BIG } from './icons.js';
+import { ICON_EXCEL_SM, ICON_DONE_BIG, ICON_POWER } from './icons.js';
 import { escapeHtml } from './escape.js';
 
 function fmtBytes(n) {
@@ -20,6 +20,11 @@ function fmtBytes(n) {
 }
 
 const ARTIFACT_LABELS = { classified: 'classified.xlsx' };
+
+// Mirror of app.js's CLOSE_UNLOCK_S — how long "Close application" stays locked
+// after the download begins, so the file can finish landing on disk. Keep the
+// two in sync.
+const CLOSE_UNLOCK_S = 20;
 
 export function render(state) {
   const summary = state.summary;
@@ -32,6 +37,15 @@ export function render(state) {
   const artifacts = state.artifacts || [];
   const excelArtifact = artifacts.find((a) => a.key === 'classified');
   const excelFailed = !excelArtifact;
+
+  // "Close application" is locked until CLOSE_UNLOCK_S after the download begins.
+  // If the Excel failed there's nothing to download or protect, so allow closing
+  // right away. `remaining` seeds the countdown text; app.js's interval keeps it
+  // live in place (by #close-hint id) so this screen isn't re-rendered per tick.
+  const closeUnlocked = state.canClose || excelFailed;
+  const remaining = state.downloadStartedAt
+    ? Math.max(0, CLOSE_UNLOCK_S - Math.floor((Date.now() - state.downloadStartedAt) / 1000))
+    : CLOSE_UNLOCK_S;
 
   const tallyHtml = Object.keys(tally).length ? `
     <div class="tally-row">
@@ -67,7 +81,14 @@ export function render(state) {
           </div>
         `}
 
-        <button data-action="backToLaunchFromOutput" class="btn btn--plain" style="align-self:center;margin-top:10px">Back to launch</button>
+        <div class="finish">
+          ${excelFailed ? '' : `<p class="finish-note">Your workbook downloaded automatically — check your Downloads folder. Closing clears this session's data and shuts the app down.</p>`}
+          <div class="finish-actions">
+            <button data-action="backToLaunchFromOutput" class="btn btn--plain">Back to launch</button>
+            <button id="close-btn" data-action="closeApp" class="btn btn--dark" style="display:inline-flex;align-items:center;gap:8px" ${closeUnlocked ? '' : 'disabled aria-disabled="true"'}>${ICON_POWER}<span>Close application</span></button>
+          </div>
+          ${closeUnlocked ? '' : `<div id="close-lock" class="finish-lock"><span id="close-hint">You can close the app in ${remaining}s…</span></div>`}
+        </div>
       </div>
     </div>`;
 }

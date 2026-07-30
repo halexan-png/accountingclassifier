@@ -187,6 +187,17 @@ export const adapter = {
     }
   },
 
+  // Deliberate "Close application" (Output screen). Stops the local server the
+  // same graceful way the idle watchdog does (POST /api/shutdown ->
+  // gna_server/routes_lifecycle.py), which also clears the throwaway workspace.
+  // Once this resolves the server is on its way down; app.js shows the end
+  // screen and stops polling so nothing else hits a dead server. NOT wrapped in
+  // a swallow-all try/catch (unlike cancelRun): a 409 "a run is in progress"
+  // must surface to the operator as a banner, so let the error propagate.
+  async shutdownApp() {
+    return jsonPost('/api/shutdown', {});
+  },
+
   async getResults() {
     return jfetch('/api/results');
   },

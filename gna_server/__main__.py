@@ -77,8 +77,17 @@ def main() -> None:
     from . import lifecycle
     from .run_manager import manager
 
+    # Both the idle watchdog and the operator's "Close application" button (POST
+    # /api/shutdown) stop the server this same way -- flip should_exit so uvicorn
+    # drains and the atexit cleanup above wipes the temp workspace. Register the
+    # hook unconditionally: the watchdog may be disabled (GNA_UI_IDLE_TIMEOUT_MIN
+    # =0) but the manual Close button must still work.
+    def _request_exit() -> None:
+        server.should_exit = True
+
+    lifecycle.register_exit(_request_exit)
     lifecycle.start_watchdog(
-        request_exit=lambda: setattr(server, "should_exit", True),
+        request_exit=_request_exit,
         is_run_active=manager.is_active,
         log=lambda msg: print(f"[gna] {msg}", flush=True),
     )

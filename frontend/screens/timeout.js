@@ -10,20 +10,10 @@
 
 export function render(_state) {
   return `
-    <div class="timeout-screen" role="alertdialog" aria-labelledby="timeout-title" aria-describedby="timeout-body">
+    <div class="timeout-screen" role="alertdialog" aria-labelledby="timeout-title">
       <div class="timeout-card">
         <img src="gnl-logo-front.png" alt="Global Net Lease" class="timeout-logo">
-        <div class="timeout-badge">Session ended</div>
         <h1 id="timeout-title" class="timeout-title">Your session timed out</h1>
-        <p id="timeout-body" class="timeout-body">
-          The application closed itself after <strong>15 minutes of inactivity</strong>
-          and cleared the data from this session. Nothing went wrong — this is the
-          normal, secure behavior that keeps your financial data from lingering.
-        </p>
-        <p class="timeout-body timeout-body--soft">
-          Any workbook you already downloaded is safe on your computer. To start a
-          new session, relaunch the app by double-clicking <strong>Start.cmd</strong>.
-        </p>
       </div>
     </div>`;
 }

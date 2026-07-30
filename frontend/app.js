@@ -29,7 +29,9 @@ import * as output from './screens/output.js';
 import * as settings from './screens/settings.js';
 import * as guide from './screens/guide.js';
 import * as timeout_ from './screens/timeout.js';
+import * as closed_ from './screens/closed.js';
 import { escapeHtml } from './screens/escape.js';
+import { ICON_WARNING } from './screens/icons.js';
 
 const root = document.getElementById('app-root');
 
@@ -46,6 +48,16 @@ const state = {
   // i.e. it idle-timed-out and shut down. Short-circuits render() to the
   // terminal "session timed out" screen.
   sessionTimedOut: false,
+
+  // Deliberate "Close application" (Output screen). sessionClosed short-circuits
+  // render() to the terminal "you're all set" end screen once the server has
+  // been asked to stop -- distinct from sessionTimedOut so the copy can say "you
+  // closed it" rather than "it timed out". closeConfirmOpen drives the "Close
+  // the application?" confirm dialog; closing is true only while the shutdown
+  // POST is in flight (disables the confirm buttons so it can't be double-fired).
+  sessionClosed: false,
+  closeConfirmOpen: false,
+  closing: false,
 
   // Q2 two-file upload + validation: the multi-tab G&A workbook and the flat
   // A&T workbook are flattened server-side into ONE workbook that everything
@@ -108,6 +120,14 @@ const state = {
   // Output (v2 §4.8)
   summary: null,
   artifacts: [],
+  // Auto-download + close gate. On a successful run the workbook downloads
+  // itself once (autoDownloaded latches that so a re-render can't re-fire it);
+  // "Close application" then stays locked until CLOSE_UNLOCK_S after the
+  // download began (downloadStartedAt), because a browser download reports no
+  // completion event we could wait on. canClose flips true when that elapses.
+  autoDownloaded: false,
+  canClose: false,
+  downloadStartedAt: null,
 
   // Settings (v2 §4.10) + Security (v2 §9)
   settingsKey: 'classifier',
@@ -205,6 +225,78 @@ async function connectOneDrive() {
   setTimeout(refreshGraphStatus, 1500);
 }
 
+// Deliberate shutdown from the Output screen's "Close application" button (after
+// the confirm dialog). Asks the server to stop (POST /api/shutdown), then shows
+// the terminal end screen and stops the liveness ping / activity beacon so
+// nothing keeps hitting a server that's on its way down. A 409 ("a run is in
+// progress") or any other error surfaces as a banner and leaves the app usable.
+async function closeApplication() {
+  if (state.closing) return;
+  setState({ closing: true });
+  try {
+    await adapter.shutdownApp();
+  } catch (err) {
+    setState({ closing: false, closeConfirmOpen: false });
+    showBanner('error', `Could not close the app: ${err.message}`);
+    return;
+  }
+  // Stop polling BEFORE flipping to the end screen: once the server drains, the
+  // ping would start failing and could otherwise race us to the timeout screen.
+  if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+  setState({ sessionClosed: true, closeConfirmOpen: false, closing: false });
+}
+
+// The Output screen auto-downloads the workbook, and the operator can also click
+// Download anytime. Both paths go through here, so the close-unlock countdown
+// starts on whichever fires first. A transient <a download> click (rather than
+// navigating the tab) keeps the Output screen intact and hints "download, don't
+// open".
+function downloadWorkbook(key) {
+  const a = document.createElement('a');
+  a.href = adapter.downloadUrl(key);
+  a.download = '';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  beginCloseUnlock();
+}
+
+// "Close application" stays locked for CLOSE_UNLOCK_S after the download begins,
+// giving the file time to actually land on disk (see downloadWorkbook: there's
+// no completion event to wait on). A live countdown updates the hint in place so
+// the Output screen's completion animation doesn't replay every second.
+const CLOSE_UNLOCK_S = 20;
+let closeUnlockTimer = null;
+function beginCloseUnlock() {
+  if (state.canClose || closeUnlockTimer) return; // already unlocked or counting
+  const startedAt = Date.now();
+  pokeState({ downloadStartedAt: startedAt });
+  closeUnlockTimer = setInterval(() => {
+    const remaining = Math.max(0, CLOSE_UNLOCK_S - Math.floor((Date.now() - startedAt) / 1000));
+    const hint = document.getElementById('close-hint');
+    if (hint) hint.textContent = `You can close the app in ${remaining}s…`;
+    if (remaining <= 0) {
+      clearInterval(closeUnlockTimer);
+      closeUnlockTimer = null;
+      pokeState({ canClose: true });
+      // Flip the button in place (no setState) so the completion checkmark
+      // doesn't re-animate; any later re-render reads canClose and stays correct.
+      const btn = document.getElementById('close-btn');
+      if (btn) { btn.disabled = false; btn.removeAttribute('aria-disabled'); }
+      const lock = document.getElementById('close-lock');
+      if (lock) lock.remove();
+    }
+  }, 1000);
+}
+
+// Re-arm the gate for a fresh run: stop any countdown and clear the latches, so
+// the next completed run auto-downloads again and re-locks Close for 20s.
+function resetCloseGate() {
+  if (closeUnlockTimer) { clearInterval(closeUnlockTimer); closeUnlockTimer = null; }
+  pokeState({ canClose: false, autoDownloaded: false, downloadStartedAt: null });
+}
+
 const actions = {
   // -- Hero --
   enterMain: () => { if (!state.heroEntered) setState({ heroEntered: true }); },
@@ -235,16 +327,33 @@ const actions = {
     const file = event.target.files && event.target.files[0];
     if (file) setQ2Slot(ds.slot, file);
   },
-  onQ2Drop: (event, ds) => {
+  onQ2Drop: (event, ds, el) => {
     event.preventDefault();
-    setState(ds.slot === 'ga' ? { dragActiveGa: false } : { dragActiveAt: false });
+    el?.classList.remove('dropzone--drag');
+    pokeState(ds.slot === 'ga' ? { dragActiveGa: false } : { dragActiveAt: false });
     if (state.workbookPhase === 'checking') return;
     const file = event.dataTransfer?.files?.[0];
     if (file) setQ2Slot(ds.slot, file);
   },
   onQ2DragOver: (event) => event.preventDefault(),
-  onQ2DragEnter: (event, ds) => { event.preventDefault(); setState(ds.slot === 'ga' ? { dragActiveGa: true } : { dragActiveAt: true }); },
-  onQ2DragLeave: (event, ds) => { event.preventDefault(); setState(ds.slot === 'ga' ? { dragActiveGa: false } : { dragActiveAt: false }); },
+  // Toggle the drag-highlight by mutating the DOM directly (no setState) --
+  // the native dragenter/dragleave pair fires repeatedly as the pointer
+  // crosses every child element inside the dropzone (the icon, the title,
+  // the sub-label) while a single drag gesture is in progress. Routing that
+  // through setState's full root.innerHTML rebuild replayed every CSS
+  // entrance animation on the page dozens of times a second -- a jarring,
+  // genuinely photosensitivity-risky flash. pokeState still keeps state in
+  // sync (for the class computed on the next real render) without forcing one.
+  onQ2DragEnter: (event, ds, el) => {
+    event.preventDefault();
+    el?.classList.add('dropzone--drag');
+    pokeState(ds.slot === 'ga' ? { dragActiveGa: true } : { dragActiveAt: true });
+  },
+  onQ2DragLeave: (event, ds, el) => {
+    event.preventDefault();
+    el?.classList.remove('dropzone--drag');
+    pokeState(ds.slot === 'ga' ? { dragActiveGa: false } : { dragActiveAt: false });
+  },
   removeQ2: (event, ds) => { event.stopPropagation(); clearQ2Slot(ds.slot); },
   continueToLaunch: () => setState({ view: 'launch' }),
 
@@ -326,13 +435,19 @@ const actions = {
   backToLaunchFromProcess: () => setState({ view: 'launch' }),
 
   // -- Output (v2 §4.8) --
-  downloadArtifact: (event, dataset) => { window.location.href = adapter.downloadUrl(dataset.key); },
+  downloadArtifact: (event, dataset) => { downloadWorkbook(dataset.key); },
   recoverNow: async () => {
+    resetCloseGate();
     const r = await adapter.startRun({ kind: 'recover', quarter: state.selectedQuarter });
     setState({ runId: r.run_id, runKind: 'recover', view: 'process', phase: null, liveRows: [], tally: {} });
     watchRun();
   },
-  backToLaunchFromOutput: () => setState({ view: 'launch', runState: 'idle', runId: null }),
+  backToLaunchFromOutput: () => { resetCloseGate(); setState({ view: 'launch', runState: 'idle', runId: null }); },
+
+  // -- Output: Close application (stops the local server) --
+  closeApp: () => setState({ closeConfirmOpen: true }),
+  cancelCloseApp: () => { if (!state.closing) setState({ closeConfirmOpen: false }); },
+  confirmCloseApp: () => { void closeApplication(); },
 
   // -- Settings (v2 §4.10) --
   selectSettingsTab: (event, dataset) => {
@@ -524,6 +639,7 @@ function updateCtxSatellites() {
 }
 
 async function goToForecast() {
+  resetCloseGate();
   setState({ view: 'forecast', runState: 'starting', sweepForecast: null, classifyForecast: null, readyChecked: false, confirmId: null });
   try {
     const r = await adapter.startRun({
@@ -589,11 +705,22 @@ function handleRunEvent(event) {
         if ((state.runKind === 'run' || state.runKind === 'recover') && p.state === 'done') {
           // Always load results; only force-navigate to Output if the operator is
           // still on a live screen — don't yank them out of Settings/Guide/etc.
-          void adapter.getResults().then((r) => setState(
-            onLiveScreen
-              ? { summary: r.summary, artifacts: r.artifacts, view: 'output' }
-              : { summary: r.summary, artifacts: r.artifacts }
-          ));
+          void adapter.getResults().then((r) => {
+            const hasArtifact = (r.artifacts || []).some((a) => a.key === 'classified');
+            setState(
+              onLiveScreen
+                ? { summary: r.summary, artifacts: r.artifacts, view: 'output' }
+                : { summary: r.summary, artifacts: r.artifacts }
+            );
+            // Auto-download the finished workbook once (the operator can still
+            // click Download too). Latched by autoDownloaded so a later
+            // re-render or reattach can't re-fire it; downloadWorkbook also
+            // starts the 20s close-unlock countdown.
+            if (hasArtifact && !state.autoDownloaded) {
+              pokeState({ autoDownloaded: true });
+              downloadWorkbook('classified');
+            }
+          });
           if (!onLiveScreen) showBanner('info', 'Run complete — open Output to download the workbook.');
         } else if (state.runKind === 'deal-profile' && p.state === 'done') {
           // This UI never starts a standalone deal-profile build (the Q2 flow's
@@ -628,7 +755,17 @@ function handleRunEvent(event) {
       const rows = [p, ...state.liveRows].slice(0, 12);
       const tally = { ...state.tally };
       tally[p.classification] = (tally[p.classification] || 0) + 1;
-      setState({ liveRows: rows, tally });
+      // Patch #live-rows directly when it's already on screen -- a row lands
+      // every few seconds throughout a run, and setState()'s full
+      // root.innerHTML rebuild would replay .main-view's entrance animation
+      // (and every icon's CSS animation under it) on each one, reading as the
+      // whole panel flashing/shaking. Only the very first row (no container
+      // yet -- rowsHtml renders nothing while liveRows is empty) needs the
+      // full render to create it.
+      const container = document.getElementById('live-rows');
+      pokeState({ liveRows: rows, tally });
+      if (container) container.innerHTML = rows.map(process_.renderRow).join('');
+      else render();
       break;
     }
     case 'confirm_request':
@@ -651,7 +788,7 @@ function handleRunEvent(event) {
 
 function dispatch(actionName, event, el) {
   const fn = actions[actionName];
-  if (typeof fn === 'function') fn(event, el.dataset);
+  if (typeof fn === 'function') fn(event, el.dataset, el);
 }
 
 root.addEventListener('click', (event) => {
@@ -682,6 +819,18 @@ root.addEventListener('dragleave', (event) => {
   const el = event.target.closest('[data-ondragleave]');
   if (el) dispatch(el.dataset.ondragleave, event, el);
 });
+// Safety net: a drop that lands even a few pixels outside a registered
+// dropzone (a gap in the flex layout, padding, whitespace between tiles) never
+// hits an element carrying `data-ondrop`, so none of the delegated handlers
+// above ever call preventDefault() for it. Without this, the browser's own
+// default action for a dropped file takes over -- for a binary file like
+// .xlsx that's silently downloading it to the Downloads folder, and it can
+// also navigate the tab away from the app entirely. This always fires
+// (window sees the event after `root`'s delegated listeners, whether or not
+// one of them already matched and handled it), so no drop can ever slip
+// through to that default action.
+window.addEventListener('dragover', (event) => event.preventDefault());
+window.addEventListener('drop', (event) => event.preventDefault());
 // Wheel/mousemove drive the hero's "scroll or hover to enter" gesture.
 root.addEventListener('wheel', (event) => { if (event.deltaY > 0) actions.enterMain(); }, { passive: true });
 root.addEventListener('mousemove', () => actions.enterMain(), { once: true });
@@ -690,6 +839,7 @@ document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
   if (state.ctxOpen) actions.closeCtx();
   else if (state.configOpen) actions.closeConfig();
+  else if (state.closeConfirmOpen) actions.cancelCloseApp();
 });
 
 // ---------------------------------------------------------------------
@@ -709,9 +859,16 @@ function screenFor(view) {
 }
 
 function render() {
-  // Terminal: once the server has idle-timed-out there's nothing left to talk
-  // to, so replace the whole app with the calm "session timed out" notice
-  // rather than let stale screens throw failed requests at a dead server.
+  // Terminal end states. sessionClosed (operator clicked "Close application")
+  // is checked FIRST so its "you're all set" copy wins over the timeout copy if
+  // a late failing ping also trips sessionTimedOut as the server drains.
+  if (state.sessionClosed) {
+    root.innerHTML = closed_.render(state);
+    return;
+  }
+  // Once the server has idle-timed-out there's nothing left to talk to, so
+  // replace the whole app with the calm "session timed out" notice rather than
+  // let stale screens throw failed requests at a dead server.
   if (state.sessionTimedOut) {
     root.innerHTML = timeout_.render(state);
     return;
@@ -739,10 +896,30 @@ function render() {
     ${screen.render(state)}
     ${state.configOpen ? configModal.render(state) : ''}
     ${state.ctxOpen ? contextModal.render(state) : ''}
+    ${state.closeConfirmOpen ? renderCloseConfirm(state) : ''}
   `;
 
   if (state.ctxOpen) updateCtxSatellites();
   if (typeof screen.afterRender === 'function') screen.afterRender(state);
+}
+
+// "Close the application?" confirm dialog (Output screen). All copy is static
+// (no user input), so nothing here needs escaping. Backdrop/Cancel both route
+// to cancelCloseApp, which no-ops while a shutdown is already in flight.
+function renderCloseConfirm(state) {
+  const busy = state.closing;
+  return `
+    <div class="modal-overlay" data-action="cancelCloseApp">
+      <div class="modal-panel modal-panel--confirm" data-action="stopPropagation" role="dialog" aria-modal="true" aria-label="Close the application">
+        <div class="modal-title">Close the application?</div>
+        <p class="modal-confirm-body">This shuts down the local server and clears the workbook and results from this session. Anything you've already downloaded stays safe on your computer.</p>
+        <div class="modal-confirm-reminder">${ICON_WARNING}<span>Make sure your <strong>classified.xlsx</strong> download finished before closing.</span></div>
+        <div class="modal-confirm-actions">
+          <button data-action="cancelCloseApp" class="btn btn--plain" ${busy ? 'disabled' : ''}>Cancel</button>
+          <button data-action="confirmCloseApp" class="btn btn--danger" ${busy ? 'disabled' : ''}>${busy ? 'Closing…' : 'Close application'}</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 const ICON_GEAR_HEADER = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
@@ -772,6 +949,9 @@ let pingFails = 0;
 let pingTimer = null;
 
 async function pingLiveness() {
+  // A deliberate close already stopped polling and showed the end screen; don't
+  // resurrect a "timed out" screen from the failing pings the shutdown causes.
+  if (state.sessionClosed) return;
   try {
     const res = await fetch('/api/ping', { cache: 'no-store' });
     pingFails = res.ok ? 0 : pingFails + 1;
@@ -802,7 +982,7 @@ const markInteraction = () => { lastInteraction = Date.now(); };
 ['mousemove', 'mousedown', 'keydown', 'wheel', 'scroll', 'touchstart', 'input']
   .forEach((evt) => window.addEventListener(evt, markInteraction, { passive: true, capture: true }));
 setInterval(() => {
-  if (state.sessionTimedOut) return;
+  if (state.sessionTimedOut || state.sessionClosed) return;
   if (lastInteraction > lastBeacon) {
     lastBeacon = Date.now();
     fetch('/api/activity', { cache: 'no-store' }).catch(() => {});

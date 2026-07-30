@@ -78,6 +78,7 @@ export function render(state) {
               <div class="tile-label">External invoices</div>
               <div class="tile-hint">${invoiceCount ? `${invoiceCount} file(s) added` : 'Drop already-named PDFs (or a whole folder), or click to browse'}</div>
               <button type="button" data-action="onInvoiceFolderBrowse" class="btn btn--outline tile-folder-btn">or choose a folder</button>
+              ${invoiceCount ? '' : `<div class="tile-hint" style="margin-top:-2px">Tip: if the folder dialog only lets you "Open" (not select a folder), navigate into it, press Ctrl+A to select every file inside, then click Open — that adds them all. Dragging the folder onto this tile works too.</div>`}
             </div>
           </div>
 
