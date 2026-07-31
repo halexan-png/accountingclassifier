@@ -1,0 +1,28 @@
+WHAT HAPPENS WHEN YOU RUN THIS
+
+You supply two source workbooks. They're combined into one worklist.
+
+Before anything else, the rows describing a company acquisition or sale
+are pulled out and read first. They build a reference list of known
+deals — the vocabulary the rest of the run will recognize — and that list
+carries forward between runs instead of being rebuilt from nothing each
+time.
+
+Every other row is then given a verdict: recurring cost, non-recurring
+cost, or a case for a person to review. The known-deal list, together
+with whatever additional notes you've supplied, informs each of those
+verdicts. Rows with a usable invoice are read one at a time, invoice
+included. Rows without one are grouped and processed in batches, since
+there's no invoice content at risk of bleeding from one row into another.
+
+What comes out is a single Excel file, containing:
+
+- Every original row, with the verdict, the reasoning behind it, the
+  supporting evidence, and the invoice's read status appended.
+- A separate sheet listing only the rows that deserve a person's
+  attention — anything flagged non-recurring or for human review —
+  grouped by vendor, with totals. Acquisition and sale rows are left off
+  this sheet; those are settled by fixed rule, not judgment.
+- A separate sheet showing the known-deal list actually used to make
+  these decisions, so the reasoning behind them can be checked.
+- A summary sheet with overall counts and cost.

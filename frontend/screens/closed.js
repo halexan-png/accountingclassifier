@@ -16,8 +16,7 @@ export function render(_state) {
     <div class="timeout-screen" role="alertdialog" aria-labelledby="closed-title" aria-describedby="closed-body">
       <div class="timeout-card">
         <img src="gnl-logo-front.png" alt="Global Net Lease" class="timeout-logo">
-        <div class="timeout-badge">Session ended</div>
-        <h1 id="closed-title" class="timeout-title">You're all set</h1>
+        <h1 id="closed-title" class="timeout-title">Your session has ended</h1>
         <p id="closed-body" class="timeout-body">
           The application has closed and this session's data was cleared. Your
           downloaded workbook is safe on your computer — nothing else was kept.

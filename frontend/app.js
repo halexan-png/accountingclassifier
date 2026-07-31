@@ -133,11 +133,12 @@ const state = {
   settingsKey: 'classifier',
   settingsContent: '',
   settingsSavedNote: '',
+  settingsEditOpen: false, // the expanded editor modal, opened from the doctrine's summary tile
   apiKeyPresent: false,
   invoiceLibrary: { dir_ready: false, csv_ready: false },
 
   // Guide (v2 §4.11)
-  guideKey: 'quickstart',
+  guideKey: 'getting_started',
   guideMarkdown: '',
 
   // Cross-cutting
@@ -147,6 +148,14 @@ const state = {
 let eventsHandle = null;
 
 function setState(patch) {
+  // Banners are view-scoped: a navigation (any patch that actually changes
+  // `view`) drops whatever banner was showing, so an error/info raised on one
+  // screen doesn't keep following the operator around after they leave it.
+  // Skipped when the same patch also sets a banner, so a call that navigates
+  // AND reports something (e.g. goToForecast's failure path) isn't clobbered.
+  if (patch.view !== undefined && patch.view !== state.view && !('banner' in patch)) {
+    patch = { ...patch, banner: null };
+  }
   Object.assign(state, patch);
   render();
 }
@@ -246,20 +255,64 @@ async function closeApplication() {
   setState({ sessionClosed: true, closeConfirmOpen: false, closing: false });
 }
 
-// The Output screen auto-downloads the workbook, and the operator can also click
-// Download anytime. Both paths go through here, so the close-unlock countdown
-// starts on whichever fires first. A transient <a download> click (rather than
-// navigating the tab) keeps the Output screen intact and hints "download, don't
-// open".
-function downloadWorkbook(key) {
+// A transient <a download> click (rather than navigating the tab) triggers a
+// browser download without disturbing whatever screen is currently showing.
+// Shared by the run output's workbook download and the Guide's sample-template
+// downloads below — the two differ only in what happens after (see downloadWorkbook).
+function triggerFileDownload(url) {
   const a = document.createElement('a');
-  a.href = adapter.downloadUrl(key);
+  a.href = url;
   a.download = '';
   a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
   a.remove();
+}
+
+// The Output screen auto-downloads the workbook, and the operator can also click
+// Download anytime. Both paths go through here, so the close-unlock countdown
+// starts on whichever fires first.
+function downloadWorkbook(key) {
+  triggerFileDownload(adapter.downloadUrl(key));
   beginCloseUnlock();
+}
+
+// The Guide's sample-template downloads (Getting Started tab). Unlike the run
+// output's classified.xlsx — a file the server just produced and we know is
+// there — these hit a static repo file by key, so the request can genuinely
+// fail (e.g. a retired/renamed key against a not-yet-restarted server). A blind
+// <a download> would happily save whatever came back, including a 404's JSON
+// body, as a file named like a spreadsheet — the operator then opens "an .xlsx"
+// that Excel refuses. So fetch it, verify it's actually OK, and only then hand
+// the browser a real Blob to save; on any failure, say so in a banner.
+async function downloadSampleFile(key) {
+  try {
+    const res = await fetch(adapter.downloadUrl(key), { cache: 'no-store' });
+    if (!res.ok) {
+      let detail = `${res.status} ${res.statusText}`;
+      try { const body = await res.json(); if (body && body.detail) detail = body.detail; } catch (_e) { /* not JSON */ }
+      throw new Error(detail);
+    }
+    const blob = await res.blob();
+    // FastAPI's FileResponse sends Content-Disposition: attachment; filename="…";
+    // honor it so the saved file keeps its real name, falling back to the key.
+    const cd = res.headers.get('content-disposition') || '';
+    const match = /filename="([^"]+)"/i.exec(cd) || /filename=([^;]+)/i.exec(cd);
+    const filename = match ? match[1].trim() : `${key}.xlsx`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Revoke later, not synchronously: some browsers cancel the download if the
+    // object URL is freed before the click's save has claimed it.
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch (err) {
+    showBanner('error', `Could not download the sample workbook: ${err.message}`);
+  }
 }
 
 // "Close application" stays locked for CLOSE_UNLOCK_S after the download begins,
@@ -303,14 +356,22 @@ const actions = {
 
   // -- Header nav --
   goHome: () => setState({ view: 'main' }),
+  // Guide/Settings are reachable from each other (the header stays visible on
+  // both), so `prevView` must anchor to the screen you were on BEFORE you
+  // started hopping between them -- if you're already on Guide or Settings,
+  // keep the existing anchor instead of overwriting it with the other one.
+  // Otherwise Guide -> Settings -> Back -> Back gets stuck bouncing between
+  // the two and never reaches Home/Launch.
   openGuide: () => {
     adapter.getDoc(state.guideKey).then((r) => {
-      setState({ prevView: state.view, view: 'guide', guideMarkdown: r.markdown });
-    });
+      const anchor = (state.view === 'guide' || state.view === 'settings') ? state.prevView : state.view;
+      setState({ prevView: anchor, view: 'guide', guideMarkdown: r.markdown });
+    }).catch((err) => showBanner('error', `Could not open the Guide: ${err.message}`));
   },
   openSettings: () => {
     adapter.getSettings(state.settingsKey).then((r) => {
-      setState({ prevView: state.view, view: 'settings', settingsContent: r.content, settingsSavedNote: '' });
+      const anchor = (state.view === 'guide' || state.view === 'settings') ? state.prevView : state.view;
+      setState({ prevView: anchor, view: 'settings', settingsContent: r.content, settingsSavedNote: '', settingsEditOpen: false });
     });
   },
   goBack: () => setState({ view: state.prevView || 'main' }),
@@ -453,6 +514,8 @@ const actions = {
   selectSettingsTab: (event, dataset) => {
     adapter.getSettings(dataset.key).then((r) => setState({ settingsKey: dataset.key, settingsContent: r.content, settingsSavedNote: '' }));
   },
+  openSettingsEdit: () => setState({ settingsEditOpen: true }),
+  closeSettingsEdit: () => setState({ settingsEditOpen: false }),
   onSettingsInput: (event) => pokeState({ settingsContent: event.target.value, settingsSavedNote: '' }),
   saveSettings: async () => {
     try {
@@ -464,9 +527,21 @@ const actions = {
   },
 
   // -- Guide (v2 §4.11) --
+  // A failed getDoc (a retired key against a not-yet-restarted server, a
+  // transient error) used to reject silently — the .then never ran, setState
+  // never fired, and the tab click looked completely dead to the operator.
+  // Surface it as a banner so a genuinely broken section says so.
   selectGuideTab: (event, dataset) => {
-    adapter.getDoc(dataset.key).then((r) => setState({ guideKey: dataset.key, guideMarkdown: r.markdown }));
+    adapter.getDoc(dataset.key)
+      .then((r) => setState({ guideKey: dataset.key, guideMarkdown: r.markdown }))
+      .catch((err) => showBanner('error', `Could not load that section: ${err.message}`));
   },
+  // Getting Started tab: the two sample workbook templates. Routed through
+  // downloadSampleFile (fetch → verify → blob) rather than a blind anchor click,
+  // so a failed request surfaces as a banner instead of saving the error
+  // response as a file named .xlsx — exactly what "the download isn't a usable
+  // Excel file" was, against a stale backend that 404'd the new download key.
+  downloadSample: (event, dataset) => { void downloadSampleFile(dataset.key); },
 
   dismissBanner: clearBanner,
 };
@@ -840,6 +915,7 @@ document.addEventListener('keydown', (event) => {
   if (state.ctxOpen) actions.closeCtx();
   else if (state.configOpen) actions.closeConfig();
   else if (state.closeConfirmOpen) actions.cancelCloseApp();
+  else if (state.settingsEditOpen) actions.closeSettingsEdit();
 });
 
 // ---------------------------------------------------------------------
@@ -881,15 +957,23 @@ function render() {
       <button data-action="dismissBanner" class="icon-btn" style="color:inherit" aria-label="Dismiss">&times;</button>
     </div>` : '';
 
+  // While a run is actually in flight (money gate through the batch loop),
+  // navigating away via the header would strand the operator off the Output
+  // screen for the rest of the session (nothing routes back to it except the
+  // run's own completion). Lock header nav so the only way off is Stop
+  // (Process screen) or Cancel (Forecast's money gate) or waiting it out.
+  const runLocked = state.runState === 'starting' || state.runState === 'running' || state.runState === 'awaiting_confirm';
+  const lockAttr = runLocked ? 'disabled title="Finish or stop the current run before navigating away"' : '';
+
   root.innerHTML = `
     ${heroValidation.renderHero(state)}
     <div class="header-bar">
-      <button data-action="goHome" class="header-logo" aria-label="Home" style="background:transparent;border:none;padding:0">
+      <button data-action="goHome" class="header-logo" aria-label="Home" style="background:transparent;border:none;padding:0" ${lockAttr}>
         <img src="gnl-logo-stacked.png" alt="Global Net Lease" style="height:46px;width:auto;filter:brightness(0) invert(1)">
       </button>
       <div class="header-actions">
-        <button data-action="openGuide" class="header-link-btn">Guide</button>
-        <button data-action="openSettings" class="icon-btn" aria-label="Settings">${ICON_GEAR_HEADER}</button>
+        <button data-action="openGuide" class="header-link-btn" ${lockAttr}>Guide</button>
+        <button data-action="openSettings" class="icon-btn" aria-label="Settings" ${lockAttr}>${ICON_GEAR_HEADER}</button>
       </div>
     </div>
     <div style="width:100%;max-width:1000px;padding:0 24px;margin-top:14px">${bannerHtml}</div>

@@ -1,0 +1,180 @@
+HOW THE CLASSIFIER DECIDES WHAT TO READ, AND IN WHAT ORDER
+
+What the model is shown before it classifies a batch of G&A rows, why it's
+arranged the way it is, and how the three editable documents fit into
+that. Written for whoever reviews or maintains the system — not as
+instructions to the model itself.
+
+
+THE FIVE THINGS THE MODEL IS SHOWN, IN ORDER
+------------------------------------------------------------
+
+Every run hands the classifier the same five pieces of background before
+it looks at a single row, always in this order:
+
+1. A one-paragraph description of the business.
+   Fixed, not editable. It states that this is a REIT, that the ledger
+   comes from MRI, and that a "row" means an account, an amount, a
+   description, and sometimes an invoice. Nothing about how to classify
+   anything — only what the words mean.
+
+2. The Classifier Doctrine (doctrines/classifier.md — editable in
+   Settings).
+   The actual rulebook: the three-way test (recurring / non-recurring /
+   human review), the decision questions, what counts as a "named deal."
+   It's the single source of truth for how a row gets judged, and it
+   applies to every row, every run, with no exceptions built in.
+
+3. A short statement of which source outranks which.
+   Fixed, and deliberately kept out of the doctrine file — see "Why this
+   is locked down," below.
+
+4. Company Norms (data/input/companynorm.md — editable in Settings,
+   optional).
+   Standing notes about this company specifically: routine vendors,
+   recurring practices, the kind of thing true quarter after quarter and
+   too specific for a general rulebook. If the file is empty or missing,
+   this block is simply left out.
+
+5. Operator context (workspace/user_deal_context.md — edited by hand, or
+   through "Additional Context" at launch).
+   Notes for the quarter being run — row X's advisor belongs to the
+   Redwood deal, that kind of thing. This is where a person tells the
+   model something it has no way of working out on its own.
+
+A sixth item follows, though no one writes it: the known-deal index,
+built by the model itself during an earlier pass over this quarter's
+acquisition and transaction activity — deal names, matter numbers,
+invoice numbers, aliases. It's placed last, after everything above.
+
+Then, separately, the batch's actual rows and invoices are sent, with one
+short reminder appended at the end.
+
+
+WHY THIS ORDER
+------------------------------------------------------------
+
+The logic: define the world, state the rulebook, state how to weigh
+conflicting sources, then layer in progressively more specific and more
+temporary context, ending with whatever was built fresh for this run.
+
+- The business description comes first because the doctrine already uses
+  words like "invoice," "description," and "row" as settled facts — they
+  need to be settled before the doctrine is read, not after.
+
+- The doctrine comes second because it's the default outcome for every
+  row before anything else is weighed; everything that follows matters
+  only where the doctrine stays silent or is explicitly overridden.
+
+- The authority statement comes third, immediately after the doctrine, so
+  that by the time the model reaches the more specific material that
+  follows — company norms, deal context — it already knows how much
+  weight to give each.
+
+- Company norms come fourth and deal context fifth: general and permanent
+  before specific and temporary. Standing company knowledge is the more
+  stable of the two; per-quarter deal notes are the freshest and most
+  situational, so they sit closest to the data they'll be applied to.
+
+- The known-deal index comes last, for a reason that has nothing to do
+  with importance: it's the only block that's genuinely different every
+  quarter, so keeping it at the end lets everything before it be reused —
+  and billed at a cheaper, cached rate — across every batch in the run,
+  instead of being reprocessed from scratch each time.
+
+Worth flagging: shown last is not the same as outranking everything. The
+known-deal index is physically the last thing the model reads, but it
+carries the least authority of the three sources that bear on a decision
+(see below) — it only ever suggests that a name might belong to a deal,
+and never settles anything on its own. Its position is about cost, not
+importance.
+
+
+THE THREE-TIER AUTHORITY RULE
+------------------------------------------------------------
+
+When the doctrine, the deal index, and the operator's notes point in
+different directions, the model is told plainly which one wins:
+
+1. The Doctrine — the default. It decides everything the two sources
+   below don't specifically speak to.
+
+2. The known-deal index — a lookup tool, nothing more. It helps the model
+   recognize that a name in a row belongs to a known deal, but that
+   recognition alone never decides the outcome; the doctrine still runs
+   its actual test.
+
+3. Operator context — the highest authority of the three. This is
+   information a person knows that appears nowhere in the ledger or the
+   invoices, so when an operator has written an explicit rule and its
+   conditions are met, that rule is followed as written, ahead of the
+   doctrine's general test.
+
+In short: the rulebook governs by default, the deal index only helps spot
+a name, and a human note overrides both when it applies.
+
+
+THE EVIDENCE RULE — HOW A ROW GETS DECIDED
+------------------------------------------------------------
+
+For every row, the model works a fixed sequence rather than jumping to a
+conclusion:
+
+1. Read the row's own text first.
+2. Read the attached invoice, if there is one — a deal's name can sit in
+   the invoice and nowhere in the row's own description.
+3. Check any names found against the known-deal index and the operator's
+   notes.
+4. Answer the doctrine's questions in order, and stop at the first one
+   that settles it.
+5. Write down the evidence and reasoning before writing down the final
+   label — the label has to follow from what was written, not the other
+   way around.
+
+The practical effect: a row that clearly names a real deal is never
+called "recurring," even when the described work sounds routine. Naming a
+deal always raises a row to human review at minimum, and settles it as
+non-recurring outright when the match is solid.
+
+
+CONFIRMING EDITS TAKE EFFECT
+------------------------------------------------------------
+
+Yes — editing and saving any of the three documents above updates the
+live system automatically. There's nothing to rebuild, redeploy, or
+restart. This was verified against the code directly, not assumed:
+
+- All three files — the doctrine, company norms, and deal context — are
+  read straight off disk at the start of each run. No cached copy sits in
+  memory between runs.
+
+- The in-app Settings screen writes directly to the same files the
+  pipeline reads (doctrines/classifier.md, doctrines/dealbuilder.md,
+  data/input/companynorm.md). Editing there is identical to editing the
+  file by hand.
+
+- As a safeguard, Settings refuses to save while a run is in progress,
+  returning a message to try again once it finishes. That's intentional:
+  a run reads these files once, at the very start, and keeps using that
+  copy for its entire length rather than re-reading row by row. An edit
+  saved mid-run would land after the copy was already taken and apply to
+  nothing. Saving between runs is exactly when it's meant to happen, and
+  the next run will pick it up.
+
+One exception worth flagging: workspace/user_deal_context.md — the
+per-quarter deal notes — isn't part of the Settings screen. It's edited
+by hand, or through the "Additional Context" box shown when launching a
+run, and those two are not the same thing:
+
+- Editing the file itself is permanent, and behaves exactly like the
+  other two documents above — picked up automatically on the next run.
+
+- Typing into "Additional Context" at launch is a one-time, this-run-only
+  override. It replaces the file's contents for that single run and is
+  never written back to disk, so it won't still be there next quarter,
+  and it won't show up if someone later opens the file to check what's in
+  it.
+
+A note meant to last belongs in the file. A one-off instruction for the
+run about to start is fine in the launch box — just don't expect it to
+persist.

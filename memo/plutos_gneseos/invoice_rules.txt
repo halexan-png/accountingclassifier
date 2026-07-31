@@ -1,0 +1,52 @@
+HOW INVOICES GET MATCHED TO A ROW
+
+Every row either carries a direct link to its invoice, or it doesn't.
+
+If it has a link, that link is what gets used. The system never falls
+back to the row's description text, even when the link turns out to be
+broken or blocked — a broken link simply marks the invoice "not read"; it
+does not trigger a search of the description.
+
+If it has no link, the system searches the description text for an
+invoice number instead, checking the main description first and turning
+to the additional description only if the main one comes up empty.
+
+To be recognized, the number has to be written one of three ways, from
+most to least reliable:
+
+- With "INV" set right beside the number, separated by a space, #, -, .,
+  or : — INV#84512, INV-84512, INV 84512. This is checked first, and it's
+  the form worth using on purpose.
+- Leading the description, followed by at least two spaces before the
+  rest of the text — "84512  Legal fees - Project Alpha".
+- As a bare number sitting next to an ordinary word, with nothing marking
+  it as an invoice number. This still works, but only by chance — don't
+  rely on it deliberately.
+
+A few rules hold regardless of which form is used:
+
+- It must contain at least one digit; a word made only of letters is
+  never picked up.
+- It must not resemble a date — 3/14/24 is always ignored.
+- It needs at least four characters when written with "INV," or five
+  characters either other way. Anything shorter is treated as if nothing
+  were written at all: it won't be looked up, and the row will show as
+  invoice not read.
+- The description field holds only forty characters. A number placed
+  right at the end of a full field can appear truncated without the
+  system being able to tell, so the safest placement is at the very
+  front, with any overflow text moved to the additional description
+  field.
+
+Whatever number appears in the description has to match the invoice's
+file name once spacing, punctuation, and case are stripped away — writing
+INV-84512 in the description matches a file named 84512.pdf just as
+readily as INV-84512.pdf.
+
+Getting the file in: only PDFs are accepted, dropped in one at a time or
+as a whole folder, each under a fixed size limit. A separate lookup file
+can optionally be added to tell two invoices apart when they'd otherwise
+share a number, but it isn't required — a correctly named PDF is enough
+on its own. When a number matches more than one file and nothing
+distinguishes them, the invoice is left unread and flagged as unclear,
+rather than guessed at.

@@ -1,0 +1,55 @@
+GETTING STARTED
+Where the files go, and the exact path from upload to output
+
+The opening screen asks for two files, side by side: the G&A workbook —
+the multi-tab export, one MRI account per tab — on the left, and the flat
+Acquisition & Transaction workbook on the right. Either drag a file onto
+its tile or click to browse for it; each slot takes an .xlsb or an .xlsx,
+up to 150 MB. Nothing happens until both are filled — drop just one and
+it waits, saying so, for its partner.
+
+The moment both are in, the app flattens them into one sheet on its own
+and runs three checks in view: file format, worksheet structure, expense
+records. Clear all three and it reports the row count and unlocks
+Continue. Fail one and it says so plainly — check both files and their
+tabs — rather than guessing further. If a real export keeps failing here,
+memo/sample_ga_workbook.xlsx and memo/sample_at_workbook.xlsx are blank
+templates cut to the exact shape each slot expects, worth opening beside
+the real file to see where it diverges. Both are one click away on this
+same tab — a download button for each, no need to go looking for the
+memo folder itself.
+
+Continue leads to Launch, where three more inputs wait, none of them
+required. Additional Context takes free-form notes about the quarter —
+typed directly, or dropped in as a .txt, .md, or .docx file — capped at
+2,750 words. External Invoices takes already-named PDFs, singly, by the
+folder, or dragged in wholesale; anything that isn't a PDF is quietly
+set aside, and each file is capped at 20 MB. OneDrive Access only matters
+if this workbook's invoice links point at OneDrive or SharePoint —
+connect it, or check the box acknowledging those links won't be read.
+Run insists on one or the other before it will go anywhere.
+
+Configure comes next, and isn't optional. Pick the quarter to analyze
+from the dropdown, drawn straight from what's actually sitting in the
+workbook, and set Minimum USD if the $999 default materiality floor
+isn't right for this run. Save it, and Run switches from its grayed-out
+look to ready.
+
+Clicking Run doesn't spend anything yet. It opens a forecast — row and
+batch counts, a cost range, an estimated wall clock, and a note that
+spending stops itself automatically if a run runs far past that estimate.
+Check the box confirming readiness and click Proceed to actually spend,
+or Cancel to walk away having spent nothing at all.
+
+From there the run is live: Build Profile, then Classify, with rows
+arriving as they're decided and a running line of cost and time
+remaining. Stop is there if it's needed, though it isn't instant —
+whatever's already in flight finishes first. What stopping actually
+costs you belongs to Odyssey, not to this page.
+
+When the run finishes, classified.xlsx downloads on its own — check the
+Downloads folder — with a Download button on screen if it's needed
+again. Closing the application afterward clears everything uploaded this
+session, and the Close button itself stays locked for twenty seconds
+after the download starts — just long enough for the file to actually
+finish landing on disk.

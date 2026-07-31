@@ -23,7 +23,10 @@ export function render(state) {
       </div>`;
   }
 
-  const spendRail = cls.cost_high_usd * 1.15;
+  // Mirrors gna_pipeline/config.py's SPEND_CAP_MULTIPLIER (2.0) — a runaway-
+  // spend backstop against a severe overrun, not a tight budget gate. Keep
+  // this in sync with that constant if it ever changes.
+  const spendRail = cls.cost_high_usd * 2.0;
 
   return `
     <div class="main-view">
@@ -48,7 +51,7 @@ export function render(state) {
             <div class="forecast-item"><span class="forecast-item-label">Wall clock</span><span class="forecast-item-value">~${cls.wall_clock_est_min.toFixed(1)} min</span></div>
             <div class="forecast-item"><span class="forecast-item-label">Total estimate</span><span class="forecast-item-value forecast-cost">${money(cls.cost_low_usd, cls.cost_high_usd)}</span></div>
           </div>
-          <div class="tile-hint">Spend rail aborts past $${spendRail.toFixed(2)} (1.15× the high estimate) — whatever is already decided stays durable.</div>
+          <div class="tile-hint">Spend rail aborts past $${spendRail.toFixed(2)} (2× the high estimate) — a safety guard against extreme overspend, not a tight budget; whatever is already decided stays durable.</div>
 
           <div class="ready-row" style="margin-top:12px">
             <input type="checkbox" id="ready-checkbox" class="ready-checkbox" ${state.readyChecked ? 'checked' : ''} data-onchange="toggleReady">

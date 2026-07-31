@@ -3,17 +3,55 @@
 // doctrine content — Additional Context on Launch stays session-only).
 // Also folds in the Security panel (§9): key present/absent (never editable
 // here — that's an ops/file task outside the app) and loopback-only note.
+//
+// Each doctrine shows as a summary tile (name + one-line description, mirroring
+// Launch's Additional Context tile) rather than an always-open textarea; the
+// tile's "Edit doctrine" button opens a large modal to do the actual editing,
+// so the editing surface gets far more room than the page's narrow column
+// allows and the permanent-write warning is unmissable right above the text.
 
-import { ICON_BACK } from './icons.js';
+import { ICON_BACK, ICON_PLUS, ICON_CLOSE, ICON_WARNING } from './icons.js';
 import { escapeHtml } from './escape.js';
 
 const TABS = [
-  { key: 'classifier', label: 'Classifier' },
-  { key: 'dealbuilder', label: 'Deal builder' },
-  { key: 'companynorm', label: 'Company norms' },
+  {
+    key: 'classifier', label: 'Classifier',
+    description: 'Governs how each G&A row is classified as recurring, non-recurring, or flagged for human review.',
+  },
+  {
+    key: 'dealbuilder', label: 'Deal builder',
+    description: "Governs how Acquisition & Transaction rows and their invoices are read to build the quarter's deal vocabulary.",
+  },
+  {
+    key: 'companynorm', label: 'Company norms',
+    description: 'Permanent, company-specific context — routine vendors and account conventions — read into every classification prompt.',
+  },
 ];
 
+function activeTab(state) {
+  return TABS.find((t) => t.key === state.settingsKey) || TABS[0];
+}
+
+function renderEditModal(state, tab) {
+  return `
+    <div class="modal-overlay" data-action="closeSettingsEdit">
+      <div class="modal-panel modal-panel--editor" data-action="stopPropagation" role="dialog" aria-modal="true" aria-label="${tab.label} doctrine">
+        <div class="modal-header">
+          <div class="modal-title">${tab.label} doctrine</div>
+          <button data-action="closeSettingsEdit" aria-label="Close" class="modal-close-btn">${ICON_CLOSE}</button>
+        </div>
+        <div class="modal-confirm-reminder">${ICON_WARNING}<span>Changes made are permanent and cannot be undone — saving a copy on your personal laptop first is recommended.</span></div>
+        <textarea class="settings-editor settings-editor--modal" data-oninput="onSettingsInput">${escapeHtml(state.settingsContent)}</textarea>
+        <div class="settings-save-row">
+          ${state.settingsSavedNote ? `<span class="settings-saved-note">${state.settingsSavedNote}</span>` : ''}
+          <button data-action="saveSettings" class="btn btn--dark">Save changes</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 export function render(state) {
+  const tab = activeTab(state);
   return `
     <div class="main-view main-view--top">
       <div class="page-shell page-shell--narrow">
@@ -23,10 +61,11 @@ export function render(state) {
         <div class="settings-tabs" style="margin-top:24px">
           ${TABS.map((t) => `<button data-action="selectSettingsTab" data-key="${t.key}" class="settings-tab ${state.settingsKey === t.key ? 'settings-tab--active' : ''}">${t.label}</button>`).join('')}
         </div>
-        <textarea class="settings-editor" data-oninput="onSettingsInput">${escapeHtml(state.settingsContent)}</textarea>
-        <div class="settings-save-row">
-          ${state.settingsSavedNote ? `<span class="settings-saved-note">${state.settingsSavedNote}</span>` : ''}
-          <button data-action="saveSettings" class="btn btn--dark">Save (permanent)</button>
+
+        <div class="tile" data-action="openSettingsEdit" style="margin-top:20px">
+          <div class="tile-header"><span class="tile-label">${tab.label} doctrine</span></div>
+          <div class="tile-preview" style="max-height:none">${tab.description}</div>
+          <button data-action="openSettingsEdit" class="dashed-btn">${ICON_PLUS} Edit doctrine</button>
         </div>
 
         <h2 style="font-weight:800;font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-primary-alt);margin-top:30px">Security</h2>
@@ -44,5 +83,6 @@ export function render(state) {
         </div>
         <div class="tile-hint" style="margin-top:8px">The API key lives in .env and is never sent to the browser — it can't be entered or edited here.</div>
       </div>
-    </div>`;
+    </div>
+    ${state.settingsEditOpen ? renderEditModal(state, tab) : ''}`;
 }

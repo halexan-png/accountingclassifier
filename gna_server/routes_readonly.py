@@ -9,6 +9,7 @@ helpers, gna_server.state, run_manager.manager) — it writes nothing.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -23,18 +24,83 @@ router = APIRouter()
 
 UI_VERSION = "0.1.0"
 
+_MEMO_ROOT = config.REPO_ROOT / "memo"
+_SPECIFICS_ROOT = _MEMO_ROOT / "plutos_gneseos"
+
 _DOWNLOAD_PATHS = {
-    # classified.xlsx is the ONLY thing the operator ever downloads -- it
-    # already carries summary.json's tally (Run Summary sheet) and
-    # quarter_deal_profile.json's contents (Deal Profile sheet) as tabs, so
-    # those two aren't offered as separate download artifacts.
+    # classified.xlsx is the ONLY thing /api/results lists as a run artifact
+    # (Output screen's download chip) -- kept separate from
+    # _STATIC_DOWNLOAD_PATHS below so a sample template never shows up there
+    # as if a run had produced it.
     "classified": config.CLASSIFIED_XLSX,
 }
 
-_DOC_PATHS = {
-    "quickstart": config.REPO_ROOT / "QUICKSTART.md",
-    "how_it_works": config.REPO_ROOT / "HOW_IT_WORKS.md",
+# Static, always-present repo files served through the same /api/download/{key}
+# route but deliberately NOT in _DOWNLOAD_PATHS: the Guide's Getting Started tab
+# links to these directly by key, independent of any workbook upload or run.
+_STATIC_DOWNLOAD_PATHS = {
+    "sample_ga": _MEMO_ROOT / "sample_ga_workbook.xlsx",
+    "sample_at": _MEMO_ROOT / "sample_at_workbook.xlsx",
 }
+
+# The Guide screen's three sections (v2 UI handoff §4.11, rebuilt): Getting
+# Started and What's Going On are each a single doc; Specifics is a
+# five-document sub-index of memo/plutos_gneseos/. QUICKSTART.md/HOW_IT_WORKS.md
+# at the repo root are no longer wired into this screen (superseded by the
+# memo/ set below) but are deliberately left on disk, not deleted.
+_DOC_PATHS = {
+    "getting_started": _MEMO_ROOT / "getting_started.txt",
+    "odyssey": _MEMO_ROOT / "odyssey.txt",
+    "pipeline_overview": _SPECIFICS_ROOT / "pipeline_overview.txt",
+    "invoice_rules": _SPECIFICS_ROOT / "invoice_rules.txt",
+    "context_tiering": _SPECIFICS_ROOT / "CONTEXT_TIERING_AND_EVIDENCE_RULES.txt",
+    # NOTE: on disk this is INTENDED_INPUT_FILE.txt, not .md as its content
+    # (real markdown headings throughout) would suggest -- if it's ever
+    # renamed back to .md, this path needs updating to match.
+    "input_format": _SPECIFICS_ROOT / "INTENDED_INPUT_FILE.txt",
+    "risk_notes": _SPECIFICS_ROOT / "operator_risk_and_reference_notes.txt",
+}
+
+_DASH_LINE_RE = re.compile(r"^-{3,}\s*$")
+
+
+def _promote_plain_text_headings(text: str) -> str:
+    """Presentation-only transform for the memo/*.txt convention (a title
+    line at the top of the file, and elsewhere an ALL-CAPS section line
+    immediately followed by a dashes-only divider) into real markdown
+    headings the frontend's renderer already knows how to style -- '#' for
+    the file's own title, '##' for each section, divider line dropped.
+
+    Applied to the served copy only; the source .txt files on disk are never
+    touched. Never called on the one doc that's already real markdown
+    (INTENDED_INPUT_FILE.md) -- see get_doc's suffix check below.
+    """
+    lines = text.splitlines()
+    out: list[str] = []
+    titled = False
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+        if not titled:
+            if stripped:
+                out.append(f"# {stripped}")
+                titled = True
+            else:
+                out.append(line)
+            i += 1
+            continue
+        next_stripped = lines[i + 1].strip() if i + 1 < len(lines) else ""
+        # A section title: no lowercase letters (survives digits/punctuation/
+        # em-dashes in headers like "4. ONE THING DOES CARRY OVER..."), with
+        # a dashes-only divider directly beneath it.
+        if stripped and not any(c.islower() for c in stripped) and _DASH_LINE_RE.match(next_stripped):
+            out.append(f"## {stripped}")
+            i += 2  # consume the divider line too
+            continue
+        out.append(line)
+        i += 1
+    return "\n".join(out)
 
 # Cached by the tracked workbook's mtime so repeated polling (the Configure
 # modal's quarter picker) doesn't re-read the whole workbook every time.
@@ -150,7 +216,7 @@ def get_results() -> dict:
 
 @router.get("/api/download/{key}")
 def download(key: str) -> FileResponse:
-    path = _DOWNLOAD_PATHS.get(key)
+    path = _DOWNLOAD_PATHS.get(key) or _STATIC_DOWNLOAD_PATHS.get(key)
     if path is None:
         raise HTTPException(404, f"unknown download key {key!r}")
     if not path.is_file():
@@ -165,4 +231,12 @@ def get_doc(key: str) -> dict:
         raise HTTPException(404, f"unknown doc key {key!r}")
     if not path.is_file():
         raise HTTPException(404, f"{path.name} not found")
-    return {"markdown": path.read_text(encoding="utf-8")}
+    text = path.read_text(encoding="utf-8")
+    # Gated on content, not file extension: a doc that already opens with a
+    # real markdown heading (currently just input_format) is left exactly as
+    # written; every other memo doc uses the plain ALL-CAPS/dashes convention
+    # and gets promoted. Extension alone isn't a safe signal here -- see the
+    # input_format note above.
+    if not text.lstrip().startswith("#"):
+        text = _promote_plain_text_headings(text)
+    return {"markdown": text}

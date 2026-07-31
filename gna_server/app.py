@@ -68,7 +68,21 @@ async def loopback_guard(request: Request, call_next):
         if not (content_type.startswith("application/json") or content_type.startswith("multipart/form-data")):
             return JSONResponse({"detail": "unsupported content-type"}, status_code=415)
 
-    return await call_next(request)
+    response = await call_next(request)
+
+    # No-build ES-module frontend (app.js + its screen imports) served as static
+    # files: browsers cache `type="module"` scripts aggressively and a plain
+    # refresh does not reliably re-fetch them, so after a code change an operator
+    # can keep running a STALE UI against a freshly-restarted backend -- the exact
+    # failure mode behind the "Guide tabs don't respond / sample download isn't a
+    # usable file after a rebuild" report. This is a single-user loopback app with
+    # no CDN and no performance budget to protect; tell the browser never to cache
+    # the frontend so every relaunch (even a plain tab refresh) picks up the
+    # current code. /api/* responses set their own semantics and are left alone.
+    if request.method == "GET" and not request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+
+    return response
 
 
 app.include_router(routes_run.router)

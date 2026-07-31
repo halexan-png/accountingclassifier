@@ -1,0 +1,144 @@
+# Intended input file
+
+Two workbooks are uploaded — a G&A slot and an A&T slot. What follows is
+exact: cell positions, header text, matching rules, all as implemented in
+`gna_pipeline/flatten_q2.py` and `gna_pipeline/ingest.py`.
+
+Empty sample templates: `memo/sample_ga_workbook.xlsx` and
+`memo/sample_at_workbook.xlsx`.
+
+---
+
+## 1. The G&A workbook (upload slot "G&A")
+
+One worksheet tab per MRI account, each read independently.
+
+Cell `A1` holds the account name, free text — Legal Fees, say — and it
+becomes both the `Category` and the `Source Tab` value in the output. Leave
+it blank and the tab's own sheet name is used instead.
+
+Cell `A2` holds the MRI account number, and it must match the pattern
+`^MR\d+` — `MR70000000`, for instance. A tab whose `A2` fails that pattern
+is skipped entirely: no error, no rows extracted, nothing.
+
+The header row can be any single row among rows one through twelve whose
+cells, taken together, contain the words "period," "counterparty," and
+"amount" — case-insensitive, one match per word, anywhere among the cells.
+Row six is the conventional spot. If no row in that range satisfies all
+three words, row six is silently assumed to be the header anyway, which
+can misread the entire tab if row six isn't actually it. Data begins
+immediately below whichever row is chosen as the header, and any row whose
+period cell is blank is dropped without comment.
+
+Header columns are matched by text — a case-insensitive substring, not a
+fixed position — so they can be reordered freely. The columns the pipeline
+looks for, and what becomes of each:
+
+- A column containing "period" supplies the period, and reaches the
+  output as `PERIOD`.
+- A column containing "counterparty" is read only to help locate the
+  header row; it never reaches the output.
+- A column containing "amount" supplies the amount, and reaches the
+  output as both `AMT` and `USD Amount`.
+- A column containing "date" supplies the entry date, reaching the output
+  as `ENTRDATE`.
+- A column containing "quarter" reaches the output as `Quarter`.
+- A column containing "invoice link" reaches the output as `Image URL -
+  Hyperlink`.
+- A column containing "page" or "type" is read only for detection and
+  context; neither reaches the output.
+- A column containing "userid" reaches the output as `USERID`.
+- A column containing "descrpn" or "description" reaches the output as
+  `DESCRPN`.
+- A column containing "addldesc" or "adddesc" reaches the output as
+  `ADDLDESC`.
+
+A tab missing one of these columns doesn't raise an error — the
+corresponding field is simply written blank for every row on that tab,
+silently.
+
+Currency isn't read from this workbook at all: every G&A row is written
+with `OCURRCODE` set to `USD` and an exchange rate of `1`.
+
+---
+
+## 2. The A&T workbook (upload slot "A&T")
+
+One flat sheet, with the header fixed to row one — no detection tolerance
+here, unlike the G&A workbook.
+
+The sheet used is whichever is literally named "Acquisition & Transaction
+2026" (case-insensitive), if one exists. Failing that, the pipeline falls
+back to the first sheet anywhere in the file whose header row contains a
+cell reading exactly "USD Amount" (case-insensitive).
+
+That header row must contain all twenty of these strings, matched
+case-insensitively but exactly — substrings don't count, columns can be
+reordered freely, and extra columns are simply ignored: PERIOD, REF,
+SOURCE, ENTITYID, ACCTNUM, DEPARTMENT, AMT, DESCRPN, PDENTRY, ENTRDATE,
+OCURRCODE, ADDLDESC, LASTDATE, USERID, Category, Quarter, Image URL,
+Image URL - Hyperlink, Exchange Rate, and USD Amount. A column worded even
+slightly differently from one of these isn't recognized, and comes out
+blank with no warning at all.
+
+Only rows where `ACCTNUM` equals `MR58200000`, or its digit-only form
+`58200000`, are kept — every other row, whether it belongs to a different
+account or is one of the thousands of blank trailing rows these exports
+tend to carry, is dropped automatically and silently. If the `ACCTNUM`
+header itself doesn't match exactly, every row is excluded and the tab
+contributes nothing, again with no warning.
+
+Currency here is native: `OCURRCODE` and the exchange rate are passed
+through as they appear, not forced to USD and one.
+
+---
+
+## 3. The merged canonical file
+
+Internally, the two uploads are combined into one flat, single-sheet
+workbook — sheet name `G&A MRI Records - With Link` — in a fixed column
+order. This is also the layout required of a single file uploaded
+directly, already flattened: `PERIOD`, `REF`, `SOURCE`, `ENTITYID`,
+`ACCTNUM`, `DEPARTMENT`, `AMT`, `DESCRPN`, `PDENTRY`, `ENTRDATE`,
+`OCURRCODE`, `ADDLDESC`, `LASTDATE`, `USERID`, `Category`, `Quarter`,
+`Image URL`, `Image URL - Hyperlink`, `Exchange Rate`, `USD Amount`, and
+`Source Tab` — twenty-one columns, in that order.
+
+Of these, the pipeline consumes fourteen fields, matched by a
+case-insensitive substring alias against row one, which makes the layout
+reorder-safe. If a field's alias can't be found anywhere in the header,
+the pipeline falls back to a fixed column index instead — garbage in, no
+error raised. That fallback only ever matters for a hand-built,
+single-file upload; the two-slot flow above always writes these headers
+verbatim, so the fallback never triggers there. The fourteen fields, their
+aliases, and their fallback columns:
+
+- **period**, aliased to "period," falls back to column 1.
+- **ref**, aliased to "ref," falls back to column 2.
+- **source**, aliased to "source," falls back to column 3.
+- **entityid**, aliased to "entityid" or "entity id," falls back to
+  column 4.
+- **acctnum**, aliased to "acctnum," "account number," or "acct," falls
+  back to column 5.
+- **department**, aliased to "department" or "dept," falls back to
+  column 6.
+- **descrptn**, aliased to "descrpn," "description," or "memo," falls
+  back to column 8.
+- **entrdate**, aliased to "entrdate" or "entry date," falls back to
+  column 10.
+- **currency**, aliased to "ocurrcode," "currcode," or "currency," falls
+  back to column 11.
+- **adddesc**, aliased to "addldesc" or "adddesc," falls back to
+  column 12.
+- **userid**, aliased to "userid" or "user id," falls back to column 14.
+- **category**, aliased to "category," falls back to column 15.
+- **invoice_url**, aliased to "image url - hyperlink," "hyperlink,"
+  "scannedcopyurl," or "invoice url," falls back to column 18.
+- **amount**, aliased to "usd amount" or "usdamt" — though it must
+  resolve to a header reading exactly "usd amount"; any other match is
+  flagged as a defect — falls back to column 20.
+
+These fourteen fields, packaged as a `RowPacket`, are the only row data
+any downstream stage ever sees — classification, invoice matching, the
+Excel output, the Human Review Report tab. Nothing else in the workbook is
+read past this point.

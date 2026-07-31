@@ -1,0 +1,49 @@
+ODYSSEY
+What the classifier does, in the time it takes to read this
+
+Two workbooks arrive, and become one list of rows. Before anything else
+touches that list, the rows describing an acquisition or a sale are
+pulled out and read on their own — they build a running vocabulary of
+this quarter's deals, a list that keeps growing quarter over quarter
+rather than starting fresh each time. Every other row is then handed one
+of three verdicts: recurring, non-recurring, or a case for a person to
+weigh in on.
+
+How a verdict gets made is worth knowing, because it's the difference
+between a tool you check and a tool you trust. A written rulebook decides
+by default — a fixed set of questions, answered in order, the same way on
+every row of every run. The model reads the row's own text, and the
+invoice attached to it if there is one, since a deal's name sometimes sits
+in the invoice and nowhere else. Recognizing a name from the running deal
+list only ever raises a suspicion, never settles anything by itself. And
+anything you've told it in writing for this specific quarter — a note
+about a disposition, a vendor to watch — outranks all of that, because
+it's the one thing in the room the model has no way of knowing on its
+own.
+
+Invoices are read one of two ways. A row with a link uses that link; a
+row without one is searched, description first, for something that looks
+like an invoice number. Worth knowing up front: an invoice longer than
+twenty pages is only ever read at its edges — the first two pages and the
+last two — so a detail sitting in the middle of a long document can go
+unseen.
+
+The single fact most worth carrying out of this page: a run that stops
+does not resume. Whatever finished stays finished, but completing the
+quarter after an interruption means running it again from the start — and
+running it again means paying again, including for rows already done the
+first time. Everything else about how spending is capped, and what a Stop
+button does versus a Cancel button, follows from that one fact; none of
+it changes it.
+
+What comes back at the end is a single file: every row, with its verdict,
+the reasoning behind it, and the evidence it leaned on, sitting alongside
+the original data. A second sheet collects just the rows worth a person's
+attention. A third shows the deal vocabulary that shaped every
+M&A-adjacent decision. A fourth totals the quarter.
+
+That's the whole shape of it. The exact meaning of every column and flag,
+the precise rules for writing an invoice number, and the fuller account of
+everything only touched on here — all of it is one level down, in plutos
+gneseos, for whenever a question runs deeper than five minutes can
+answer.

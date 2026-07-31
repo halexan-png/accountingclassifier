@@ -36,6 +36,12 @@ export function render(state) {
   const phase = state.phase;
   const snap = state.statusSnapshot;
   const stopping = state.runState === 'interrupted' || (state.runMessage && /stop/i.test(state.runMessage));
+  // Mirrors app.js's header lock: while the run is genuinely live, the only
+  // way off this screen is Stop (below) or waiting for it to finish -- not
+  // this top nav button, which would otherwise strand the operator off the
+  // Output screen for the rest of the session.
+  const runLocked = state.runState === 'starting' || state.runState === 'running' || state.runState === 'awaiting_confirm';
+  const backLockAttr = runLocked ? 'disabled title="Finish or stop the current run before navigating away"' : '';
 
   const statsHtml = snap ? `
     <div class="stat-row">
@@ -69,7 +75,7 @@ export function render(state) {
   return `
     <div class="main-view">
       <div class="page-shell" style="max-width:760px">
-        <button data-action="backToLaunchFromProcess" class="back-btn">${ICON_BACK} Back</button>
+        <button data-action="backToLaunchFromProcess" class="back-btn" ${backLockAttr}>${ICON_BACK} Back</button>
       </div>
       <div class="panel">
         <div class="step-chips">

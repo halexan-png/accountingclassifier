@@ -39,8 +39,13 @@ const MOCK_SETTINGS = {
 };
 
 const MOCK_DOCS = {
-  quickstart: '# Guide\n\n1. Drop your G&A and A&T workbooks.\n2. Pick a quarter.\n3. Review the forecast and tick "ready".\n4. Watch it run, then download the classified workbook.\n',
-  how_it_works: '# How It Works\n\n_This page is being rewritten — check back soon._\n',
+  getting_started: '# Getting Started\n\nMock content for offline UI dev — real copy lives in memo/getting_started.txt.\n',
+  odyssey: '# Odyssey\n\nMock content for offline UI dev — real copy lives in memo/odyssey.txt.\n',
+  pipeline_overview: '# Pipeline Overview\n\nMock content for offline UI dev.\n',
+  invoice_rules: '# Invoice Matching\n\nMock content for offline UI dev.\n',
+  context_tiering: '# Context Tiering & Evidence\n\nMock content for offline UI dev.\n',
+  input_format: '# Input File Format\n\nMock content for offline UI dev.\n',
+  risk_notes: '# Risk & Reference Notes\n\nMock content for offline UI dev.\n',
 };
 
 let settingsStore = { ...MOCK_SETTINGS };
@@ -315,7 +320,7 @@ export const adapter = {
   },
 
   downloadUrl(key) {
-    const content = 'mock classified.xlsx placeholder -- Wave 3 wires this to the real download';
+    const content = `mock ${key} placeholder -- the real adapter downloads the actual file`;
     const blob = new Blob([content], { type: 'text/plain' });
     return URL.createObjectURL(blob);
   },

@@ -20,6 +20,10 @@ export const ICON_PLUS = `<svg width="16" height="16" viewBox="0 0 24 24" fill="
 
 export const ICON_UPLOAD = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M12 4v11M8 8l4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
+// Mirror of ICON_UPLOAD with the arrowhead reversed -- the Guide screen's
+// sample-workbook downloads (Getting Started tab).
+export const ICON_DOWNLOAD = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M12 4v11M8 11l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
 export const ICON_EXCEL = `<svg width="76" height="76" viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="9" fill="#107C41"/><rect x="4" y="4" width="40" height="20" rx="9" fill="#ffffff" opacity=".07"/><path d="M18 17 L30 31 M30 17 L18 31" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round"/></svg>`;
 
 export const ICON_EXCEL_SM = `<svg width="34" height="34" viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="9" fill="#107C41"/><path d="M18 17 L30 31 M30 17 L18 31" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round"/></svg>`;

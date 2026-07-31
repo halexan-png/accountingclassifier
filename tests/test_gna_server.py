@@ -485,15 +485,79 @@ def test_run_request_omitted_user_deal_context_is_none(client, tmp_path, monkeyp
 
 
 def test_docs_endpoint_reads_real_repo_file(client):
-    resp = client.get("/api/docs/quickstart")
+    resp = client.get("/api/docs/getting_started")
     assert resp.status_code == 200
     assert "markdown" in resp.json()
     assert len(resp.json()["markdown"]) > 0
 
 
+def test_docs_all_seven_keys_resolve(client):
+    for key in (
+        "getting_started", "odyssey", "pipeline_overview", "invoice_rules",
+        "context_tiering", "input_format", "risk_notes",
+    ):
+        resp = client.get(f"/api/docs/{key}")
+        assert resp.status_code == 200, key
+        assert len(resp.json()["markdown"]) > 0, key
+
+
+def test_docs_old_keys_retired(client):
+    assert client.get("/api/docs/quickstart").status_code == 404
+    assert client.get("/api/docs/how_it_works").status_code == 404
+
+
+def test_docs_promotes_plain_text_headings(client):
+    markdown = client.get("/api/docs/context_tiering").json()["markdown"]
+    assert markdown.startswith("# HOW THE CLASSIFIER DECIDES WHAT TO READ, AND IN WHAT ORDER")
+    assert "## THE FIVE THINGS THE MODEL IS SHOWN, IN ORDER" in markdown
+    # The dashes divider line under each promoted heading must be consumed,
+    # not just left dangling under the new '##'.
+    assert not any(line.strip() and set(line.strip()) == {"-"} for line in markdown.splitlines())
+
+
+def test_docs_leaves_real_markdown_untouched(client):
+    markdown = client.get("/api/docs/input_format").json()["markdown"]
+    assert markdown.startswith("# Intended input file")
+    assert "## 1. The G&A workbook" in markdown
+
+
 def test_docs_unknown_key_404(client):
     resp = client.get("/api/docs/nope")
     assert resp.status_code == 404
+
+
+def test_download_sample_workbooks(client):
+    assert client.get("/api/download/sample_ga").status_code == 200
+    assert client.get("/api/download/sample_at").status_code == 200
+
+
+def test_static_frontend_is_never_cached(client):
+    # The no-build ES-module frontend must be served with Cache-Control: no-store
+    # so a browser can't keep running a stale app.js/guide.js against a restarted
+    # backend (the staleness that made the rebuilt Guide's tabs/downloads look
+    # broken). Guards the app.py middleware that stamps this on static GETs.
+    resp = client.get("/app.js")
+    assert resp.status_code == 200
+    assert resp.headers.get("cache-control") == "no-store"
+
+
+def test_api_responses_are_not_forced_no_store(client):
+    # The no-store stamp is scoped to the static frontend only -- /api/* handlers
+    # own their own cache semantics and must not be blanket-tagged by the same
+    # middleware.
+    resp = client.get("/api/docs/odyssey")
+    assert resp.status_code == 200
+    assert resp.headers.get("cache-control") != "no-store"
+
+
+def test_results_endpoint_never_lists_static_samples(client):
+    # sample_ga/sample_at are real, always-present files on disk (unlike
+    # classified.xlsx, a run artifact) -- a regression here would make every
+    # completed run's Output screen show two extra, unrelated download chips.
+    artifacts = client.get("/api/results").json()["artifacts"]
+    keys = {a["key"] for a in artifacts}
+    assert "sample_ga" not in keys
+    assert "sample_at" not in keys
 
 
 def test_settings_roundtrip_never_touches_real_doctrine_file(client, tmp_path, monkeypatch):

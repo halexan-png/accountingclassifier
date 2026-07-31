@@ -150,6 +150,7 @@ img { max-width: 100%; }
 }
 .icon-btn { border: none; background: none; cursor: pointer; display: flex; align-items: center; padding: 4px; color: rgba(255, 255, 255, .92); }
 .icon-btn:focus-visible, .header-link-btn:focus-visible, .header-logo:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 4px; }
+.header-logo:disabled, .header-link-btn:disabled, .icon-btn:disabled { opacity: .35; cursor: not-allowed; }
 
 .main-view { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 48px 24px; gap: 34px; animation: omFade .5s ease; }
 .main-view--top { justify-content: flex-start; }
@@ -194,11 +195,6 @@ img { max-width: 100%; }
   gap: 18px; max-width: 480px; animation: omHeroIn .7s ease both;
 }
 .timeout-logo { width: 150px; height: auto; margin-bottom: 6px; }
-.timeout-badge {
-  font-weight: 700; font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
-  color: var(--warning-ink-dark); background: var(--warning-bg);
-  padding: 6px 12px; border-radius: 999px;
-}
 .timeout-title {
   margin: 0; font-weight: 700; font-size: clamp(22px, 3.4vmin, 32px); line-height: 1.1;
   letter-spacing: .01em; text-transform: uppercase; color: var(--ink-primary-alt);
@@ -221,6 +217,7 @@ img { max-width: 100%; }
   border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 7px;
   font-weight: 600; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); padding: 4px 0;
 }
+.back-btn:disabled { opacity: .4; cursor: not-allowed; }
 .page-shell { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 20px; }
 .page-shell--narrow { max-width: 640px; }
 .page-shell--wide { max-width: 1200px; }
@@ -366,6 +363,12 @@ img { max-width: 100%; }
 /* Compact confirm dialog (e.g. "Close the application?"). Narrower than the
    820px config/context modals; must come AFTER .modal-panel so its width wins. */
 .modal-panel--confirm { width: 460px; padding: 28px 30px 24px; gap: 8px; }
+
+/* Doctrine editor modal (Settings) -- much larger than the 820px config/context
+   modals so the editing surface actually gets more room than the page column
+   it replaces; must come AFTER .modal-panel so its sizing wins. */
+.modal-panel--editor { width: min(1100px, 92vw); max-height: 92vh; }
+.settings-editor--modal { flex: 1; min-height: 50vh; }
 .modal-confirm-body { font-size: 14px; line-height: 1.6; color: var(--ink-secondary); margin: 8px 0 4px; }
 .modal-confirm-reminder {
   display: flex; align-items: flex-start; gap: 10px; background: var(--warning-bg); color: var(--warning-ink-dark);
@@ -499,12 +502,42 @@ img { max-width: 100%; }
 .badge--warn { background: var(--warning-bg); color: var(--warning-ink-dark); }
 
 .guide-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.markdown-view {
-  line-height: 1.7; color: var(--ink-secondary); font-size: 17px;
-  font-family: 'Times New Roman', Times, Georgia, serif;
+
+/* Specifics sub-navigation: deliberately quieter than the .settings-tab pills
+   above it (underline rather than a filled pill) so the two-level hierarchy —
+   section, then document — reads at a glance instead of looking like a
+   second row of identical tabs. */
+.guide-subtabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line-2); margin: 2px 0 6px; }
+.guide-subtab {
+  border: none; border-bottom: 2px solid transparent; background: none; cursor: pointer;
+  padding: 8px 12px 9px; margin-bottom: -1px; font-family: var(--font-sans);
+  font-weight: 600; font-size: 12.5px; color: var(--ink-faint);
 }
-.markdown-view h1, .markdown-view h2, .markdown-view h3 { color: var(--ink-primary-alt); font-weight: 700; }
-.markdown-view code { background: var(--surface-well); padding: 2px 6px; border-radius: 4px; font-size: .9em; font-family: 'SFMono-Regular', Consolas, monospace; }
+.guide-subtab:hover { color: var(--ink-secondary); }
+.guide-subtab--active { color: var(--ink-primary-alt); border-bottom-color: var(--action-dark); }
+
+.sample-download-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 4px; }
+
+/* Editorial reading column for the Guide's documents — a serif stack, a
+   comfortable line measure well short of the page shell's 1200px, and a
+   restrained heading hierarchy: h1 as a small tracked-out nameplate (every
+   doc's own title line, promoted server-side — see routes_readonly.py's
+   _promote_plain_text_headings), h2 as a quieter in-page section break. */
+.markdown-view {
+  line-height: 1.75; color: var(--ink-secondary); font-size: 17.5px; max-width: 700px;
+  font-family: Georgia, 'Times New Roman', Times, ui-serif, serif;
+}
+.markdown-view h1 {
+  color: var(--ink-primary-alt); font-weight: 700; font-size: 14px;
+  letter-spacing: .13em; text-transform: uppercase; margin: 0 0 16px;
+}
+.markdown-view h2 {
+  color: var(--ink-primary-alt); font-weight: 700; font-size: 21px; margin: 32px 0 12px;
+}
+.markdown-view h3 { color: var(--ink-primary-alt); font-weight: 700; }
+.markdown-view p { margin: 0 0 18px; }
+.markdown-view li { margin-bottom: 6px; }
+.markdown-view code { background: var(--surface-well); padding: 2px 6px; border-radius: 4px; font-size: .85em; font-family: 'SFMono-Regular', Consolas, monospace; }
 .markdown-view pre { background: var(--surface-well); padding: 14px; border-radius: var(--radius-sm); overflow-x: auto; font-family: 'SFMono-Regular', Consolas, monospace; }
 .markdown-view a { color: var(--link-blue); }
 .markdown-view table { border-collapse: collapse; width: 100%; }

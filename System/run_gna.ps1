@@ -348,7 +348,7 @@ function Sync-Results {
 function Invoke-FinanceRun {
     param([string[]] $GnaArgs)
     if (-not $apiKeySet) {
-        Write-Host "  ANTHROPIC_API_KEY is not set -- this run will fail. Add it to .env first (see QUICKSTART.md)." -ForegroundColor Yellow
+        Write-Host "  ANTHROPIC_API_KEY is not set -- this run will fail. Add it to .env first (see System\QUICKSTART.md)." -ForegroundColor Yellow
     }
     Invoke-Gna -GnaArgs $GnaArgs -Quiet
     $code = $LASTEXITCODE
