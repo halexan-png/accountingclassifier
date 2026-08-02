@@ -28,10 +28,10 @@ router = APIRouter()
 
 _WORKBOOK_SUFFIXES = (".xlsb", ".xlsx")
 
-# Upload size caps (server-side hygiene — bound disk-fill / memory on the two
+# Upload size caps (server-side hygiene — bound disk-fill / memory on the
 # routes that lacked a limit; invoices already cap via config.INVOICE_MAX_BYTES).
-# Generous ceilings: real workbooks are well under 1 MB and profile JSON is tiny.
-_WORKBOOK_MAX_BYTES = 150 * 1024 * 1024
+# Workbooks are uncapped (operator's call — real xlsb exports can run large);
+# profile JSON stays capped since it's always tiny.
 _DEAL_PROFILE_MAX_BYTES = 25 * 1024 * 1024
 _CONTEXT_MAX_BYTES = 25 * 1024 * 1024
 
@@ -58,8 +58,6 @@ async def upload_workbook(file: UploadFile) -> dict:
     suffix = Path(filename).suffix.lower()
     if suffix not in _WORKBOOK_SUFFIXES:
         raise HTTPException(400, f"unsupported workbook type {suffix!r}; expected .xlsb or .xlsx")
-    if file.size is not None and file.size > _WORKBOOK_MAX_BYTES:
-        raise HTTPException(413, f"workbook exceeds the {_WORKBOOK_MAX_BYTES}-byte limit")
 
     content = await file.read()
     config.WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
@@ -91,18 +89,16 @@ async def upload_workbook(file: UploadFile) -> dict:
 
 
 async def _read_workbook_upload(file: UploadFile, label: str) -> tuple[str, bytes]:
-    """Validate ONE workbook upload (suffix + size) and read its bytes.
+    """Validate ONE workbook upload (suffix only -- size is uncapped) and read its bytes.
 
     Shared by the two-file Q2 route below for its `ga`/`at` inputs -- same
-    suffix/size rules as the single-file /api/workbook route, but `label`
+    suffix rule as the single-file /api/workbook route, but `label`
     ("G&A"/"A&T") is folded into the error so the operator knows WHICH
     dropzone was wrong."""
     filename = _safe_filename(file.filename or "")
     suffix = Path(filename).suffix.lower()
     if suffix not in _WORKBOOK_SUFFIXES:
         raise HTTPException(400, f"unsupported {label} workbook type {suffix!r}; expected .xlsb or .xlsx")
-    if file.size is not None and file.size > _WORKBOOK_MAX_BYTES:
-        raise HTTPException(413, f"{label} workbook exceeds the {_WORKBOOK_MAX_BYTES}-byte limit")
     return filename, await file.read()
 
 

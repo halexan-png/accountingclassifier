@@ -69,8 +69,9 @@ Three optional inputs live here, before you configure anything:
 - **Additional context** — free-form notes to steer the classifier: a
   disposition that never posted to the M&A account, a vendor to rule in or
   out, a matter number worth watching for. Type it directly, or drop a
-  `.txt`, `.md`, or `.docx` file. There's a hard ceiling of **2,750 words**
-  — the counter turns red as you approach it and won't let you cross it.
+  `.txt`, `.md`, or `.docx` file. It's guided at **3,500 words** — the
+  counter turns red past that point, but you can keep typing; it just
+  means more context that can dilute the reasoning.
 - **External invoices** — drag in already-named invoice PDFs, or a whole
   folder of them, so the classifier reads them directly instead of leaning
   on a scanned-copy link.

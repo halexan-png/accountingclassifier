@@ -163,8 +163,9 @@ The CLI's equivalent, via `.\System\run_gna.ps1`, opens this menu:
    explicitly rule in or out, a matter number to watch for). See the comment
    block at the top of that file. There's a 2,500-word hard cap; an empty or
    missing file just means no extra context this quarter. (This is the
-   CLI/file equivalent of the web UI's **Additional Context** box, which has
-   its own 2,750-word cap and is session-only — see §6.)
+   CLI/file equivalent of the web UI's **Additional Context** box, which is
+   guided at 3,500 words (going over just flags a warning) and is
+   session-only — see §6.)
 3. **Pick a quarter.** The tool lists every quarter it found in the
    flattened workbook, e.g.:
    ```

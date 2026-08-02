@@ -5,7 +5,7 @@ The opening screen asks for two files, side by side: the G&A workbook —
 the multi-tab export, one MRI account per tab — on the left, and the flat
 Acquisition & Transaction workbook on the right. Either drag a file onto
 its tile or click to browse for it; each slot takes an .xlsb or an .xlsx,
-up to 150 MB. Nothing happens until both are filled — drop just one and
+no size limit. Nothing happens until both are filled — drop just one and
 it waits, saying so, for its partner.
 
 The moment both are in, the app flattens them into one sheet on its own
@@ -21,10 +21,12 @@ memo folder itself.
 
 Continue leads to Launch, where three more inputs wait, none of them
 required. Additional Context takes free-form notes about the quarter —
-typed directly, or dropped in as a .txt, .md, or .docx file — capped at
-2,750 words. External Invoices takes already-named PDFs, singly, by the
-folder, or dragged in wholesale; anything that isn't a PDF is quietly
-set aside, and each file is capped at 20 MB. OneDrive Access only matters
+typed directly, or dropped in as a .txt, .md, or .docx file — guided at
+3,500 words; going over doesn't block anything, it just flags a warning
+that more context can dilute the reasoning. External Invoices takes
+already-named PDFs, singly, by the folder, or dragged in wholesale;
+anything that isn't a PDF is quietly set aside, and each file is capped
+at 20 MB. OneDrive Access only matters
 if this workbook's invoice links point at OneDrive or SharePoint —
 connect it, or check the box acknowledging those links won't be read.
 Run insists on one or the other before it will go anywhere.
