@@ -483,7 +483,7 @@ img { max-width: 100%; }
    Settings / Guide
    --------------------------------------------------------------------- */
 
-.settings-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.settings-tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .settings-tab {
   border: 1px solid var(--line-5); background: #fff; cursor: pointer; padding: 10px 18px; border-radius: var(--radius-sm);
   font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-secondary);
@@ -494,20 +494,19 @@ img { max-width: 100%; }
   padding: 18px; font-size: 14px; line-height: 1.6; color: var(--ink-primary-alt); font-family: 'SFMono-Regular', Consolas, monospace; background: #fff;
 }
 .settings-save-row { display: flex; align-items: center; gap: 14px; justify-content: flex-end; }
-.settings-saved-note { font-weight: 600; font-size: 12px; color: var(--success-ink-dark); }
 .security-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--line-3); }
 .security-label { font-weight: 600; font-size: 13px; color: var(--ink-secondary); }
 .badge { font-weight: 700; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; }
 .badge--ok { background: var(--success-bg); color: var(--success-ink-dark); }
 .badge--warn { background: var(--warning-bg); color: var(--warning-ink-dark); }
 
-.guide-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.guide-tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 10px; }
 
 /* Specifics sub-navigation: deliberately quieter than the .settings-tab pills
    above it (underline rather than a filled pill) so the two-level hierarchy —
    section, then document — reads at a glance instead of looking like a
    second row of identical tabs. */
-.guide-subtabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line-2); margin: 2px 0 6px; }
+.guide-subtabs { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; border-bottom: 1px solid var(--line-2); margin: 2px 0 6px; }
 .guide-subtab {
   border: none; border-bottom: 2px solid transparent; background: none; cursor: pointer;
   padding: 8px 12px 9px; margin-bottom: -1px; font-family: var(--font-sans);
@@ -516,7 +515,7 @@ img { max-width: 100%; }
 .guide-subtab:hover { color: var(--ink-secondary); }
 .guide-subtab--active { color: var(--ink-primary-alt); border-bottom-color: var(--action-dark); }
 
-.sample-download-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 4px; }
+.sample-download-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 6px 0 4px; }
 
 /* Editorial reading column for the Guide's documents — a serif stack, a
    comfortable line measure well short of the page shell's 1200px, and a
@@ -524,7 +523,7 @@ img { max-width: 100%; }
    doc's own title line, promoted server-side — see routes_readonly.py's
    _promote_plain_text_headings), h2 as a quieter in-page section break. */
 .markdown-view {
-  line-height: 1.75; color: var(--ink-secondary); font-size: 17.5px; max-width: 700px;
+  line-height: 1.75; color: var(--ink-secondary); font-size: 17.5px; max-width: 700px; margin: 0 auto;
   font-family: Georgia, 'Times New Roman', Times, ui-serif, serif;
 }
 .markdown-view h1 {

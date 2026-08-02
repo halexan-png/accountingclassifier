@@ -82,6 +82,7 @@ const state = {
   invoiceFiles: [], // [{name, ok, reason?}]
   ctxOpen: false,
   ctxError: '',
+  ctxOverCap: false,
 
   // OneDrive/SharePoint access (optional) — connecting lets invoice_read
   // fetch OneDrive/SharePoint invoice links via Microsoft Graph instead of
@@ -132,7 +133,6 @@ const state = {
   // Settings (v2 §4.10) + Security (v2 §9)
   settingsKey: 'classifier',
   settingsContent: '',
-  settingsSavedNote: '',
   settingsEditOpen: false, // the expanded editor modal, opened from the doctrine's summary tile
   apiKeyPresent: false,
   invoiceLibrary: { dir_ready: false, csv_ready: false },
@@ -371,7 +371,7 @@ const actions = {
   openSettings: () => {
     adapter.getSettings(state.settingsKey).then((r) => {
       const anchor = (state.view === 'guide' || state.view === 'settings') ? state.prevView : state.view;
-      setState({ prevView: anchor, view: 'settings', settingsContent: r.content, settingsSavedNote: '', settingsEditOpen: false });
+      setState({ prevView: anchor, view: 'settings', settingsContent: r.content, settingsEditOpen: false });
     });
   },
   goBack: () => setState({ view: state.prevView || 'main' }),
@@ -419,11 +419,11 @@ const actions = {
   continueToLaunch: () => setState({ view: 'launch' }),
 
   // -- Launch: Additional Context modal (v2 §4.3) --
-  openCtx: () => setState({ ctxOpen: true, ctxError: '' }),
+  openCtx: () => setState({ ctxOpen: true, ctxError: '', ctxOverCap: wordCount(state.userDealContext) > WORD_MAX }),
   closeCtx: () => setState({ ctxOpen: false }),
   onCtxInput: (event) => {
-    const { text, error } = limitContextWords(event.target.value);
-    pokeState({ userDealContext: text, ctxError: error });
+    const text = limitContextChars(event.target.value);
+    pokeState({ userDealContext: text, ctxOverCap: wordCount(text) > WORD_MAX });
     updateCtxSatellites();
   },
   onCtxBrowse: () => document.getElementById('ctx-file-input')?.click(),
@@ -512,15 +512,16 @@ const actions = {
 
   // -- Settings (v2 §4.10) --
   selectSettingsTab: (event, dataset) => {
-    adapter.getSettings(dataset.key).then((r) => setState({ settingsKey: dataset.key, settingsContent: r.content, settingsSavedNote: '' }));
+    adapter.getSettings(dataset.key).then((r) => setState({ settingsKey: dataset.key, settingsContent: r.content }));
   },
   openSettingsEdit: () => setState({ settingsEditOpen: true }),
   closeSettingsEdit: () => setState({ settingsEditOpen: false }),
-  onSettingsInput: (event) => pokeState({ settingsContent: event.target.value, settingsSavedNote: '' }),
+  onSettingsInput: (event) => pokeState({ settingsContent: event.target.value }),
   saveSettings: async () => {
     try {
       await adapter.putSettings(state.settingsKey, state.settingsContent);
-      setState({ settingsSavedNote: 'Saved — this is now the live doctrine every run reads.' });
+      setState({ settingsEditOpen: false });
+      showBanner('info', 'Saved — this is now the live doctrine every run reads.');
     } catch (err) {
       showBanner('error', `Could not save: ${err.message}`);
     }
@@ -662,19 +663,16 @@ function walkEntry(entry, out) {
   });
 }
 
-const WORD_MAX = 2750;
-const CHAR_MAX = 22000;
+// WORD_MAX is a soft guide, not an enforced ceiling -- the operator can type
+// or paste past it; going over just surfaces a dilution warning (see
+// updateCtxSatellites/context-modal.js) instead of blocking input. CHAR_MAX
+// is the real hard backstop, set far above WORD_MAX so it only guards against
+// a pathological paste (e.g. an entire document dropped in), never the
+// ordinary case of running somewhat over the soft cap.
+const WORD_MAX = 3500;
+const CHAR_MAX = 100000;
 function wordCount(str) { return str.trim() ? str.trim().split(/\s+/).length : 0; }
-function limitContextWords(str) {
-  let s = str.slice(0, CHAR_MAX);
-  const tokens = s.split(/(\s+)/);
-  let n = 0, out = '';
-  for (const tok of tokens) {
-    if (/\S/.test(tok)) { if (n >= WORD_MAX) break; n++; }
-    out += tok;
-  }
-  return { text: out, error: '' };
-}
+function limitContextChars(str) { return str.slice(0, CHAR_MAX); }
 function readContextFile(file) {
   if (!file) return;
   pokeState({ ctxError: '' });
@@ -695,22 +693,21 @@ function readContextFile(file) {
 }
 
 function mergeContextText(text) {
-  const combined = (state.userDealContext ? state.userDealContext + '\n' : '') + text;
-  if (wordCount(combined) > WORD_MAX || combined.length > CHAR_MAX) {
-    setState({ ctxError: `File not added — it exceeds the ${WORD_MAX}-word limit.` });
-    return;
-  }
-  setState({ userDealContext: combined, ctxError: '' });
+  const combined = limitContextChars((state.userDealContext ? state.userDealContext + '\n' : '') + text);
+  setState({ userDealContext: combined, ctxError: '', ctxOverCap: wordCount(combined) > WORD_MAX });
 }
 function updateCtxSatellites() {
   const count = wordCount(state.userDealContext);
+  const over = count > WORD_MAX;
   const counter = document.getElementById('ctx-word-count');
   if (counter) {
     counter.textContent = `${count} / ${WORD_MAX} words`;
-    counter.style.color = count >= WORD_MAX ? 'var(--error-ink)' : 'var(--ink-faint)';
+    counter.className = `word-gauge${over ? ' word-gauge--over' : ''}`;
   }
   const textarea = document.getElementById('ctx-textarea');
   if (textarea && textarea.value !== state.userDealContext) textarea.value = state.userDealContext;
+  const warning = document.getElementById('ctx-dilute-warning');
+  if (warning) warning.style.display = over ? 'flex' : 'none';
 }
 
 async function goToForecast() {

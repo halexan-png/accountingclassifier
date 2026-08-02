@@ -43,7 +43,6 @@ function renderEditModal(state, tab) {
         <div class="modal-confirm-reminder">${ICON_WARNING}<span>Changes made are permanent and cannot be undone — saving a copy on your personal laptop first is recommended.</span></div>
         <textarea class="settings-editor settings-editor--modal" data-oninput="onSettingsInput">${escapeHtml(state.settingsContent)}</textarea>
         <div class="settings-save-row">
-          ${state.settingsSavedNote ? `<span class="settings-saved-note">${state.settingsSavedNote}</span>` : ''}
           <button data-action="saveSettings" class="btn btn--dark">Save changes</button>
         </div>
       </div>

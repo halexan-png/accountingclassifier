@@ -45,7 +45,7 @@ function oneDriveTile(state) {
 
 export function render(state) {
   const ctxCount = wordCount(state.userDealContext);
-  const gaugeClass = ctxCount >= 2750 ? 'word-gauge--over' : ctxCount >= 2200 ? 'word-gauge--warn' : '';
+  const gaugeClass = ctxCount > 3500 ? 'word-gauge--over' : ctxCount >= 2950 ? 'word-gauge--warn' : '';
   const invoiceCount = state.invoiceFiles.length;
   const oneDriveOk = state.oneDriveStatus === 'connected' || state.oneDriveAck;
   const runReady = state.configured && oneDriveOk;
@@ -63,7 +63,7 @@ export function render(state) {
           <div class="tile" data-action="openCtx" data-ondrop="onCtxDrop" data-ondragover="onDragOver">
             <div class="tile-header">
               <span class="tile-label">Additional context</span>
-              <span class="word-gauge ${gaugeClass}">${ctxCount} / 2750 words</span>
+              <span class="word-gauge ${gaugeClass}">${ctxCount} / 3500 words</span>
             </div>
             <button data-action="openCtx" class="dashed-btn">${ICON_PLUS} ${ctxCount > 0 ? 'Edit context' : 'Add context'}</button>
             ${ctxCount > 0 ? `<div class="tile-preview">${escapeHtml(state.userDealContext)}</div>` : ''}
