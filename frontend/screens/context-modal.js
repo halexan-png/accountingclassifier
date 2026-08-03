@@ -2,7 +2,7 @@
 // Session-only: never written to disk (kwarg-only user_deal_context_override
 // on the run request); resets on refresh.
 
-import { ICON_CLOSE, ICON_UPLOAD, ICON_ERROR, ICON_WARNING } from './icons.js';
+import { ICON_CLOSE, ICON_UPLOAD, ICON_ERROR, ICON_WARNING, ICON_DOWNLOAD } from './icons.js';
 import { escapeHtml } from './escape.js';
 
 const WORD_MAX = 3500;
@@ -20,6 +20,10 @@ export function render(state) {
             <span id="ctx-word-count" class="word-gauge${over ? ' word-gauge--over' : ''}">${count} / ${WORD_MAX} words</span>
             <button data-action="closeCtx" aria-label="Close" class="modal-close-btn">${ICON_CLOSE}</button>
           </div>
+        </div>
+        <div class="ctx-skill-strip">
+          <span class="ctx-skill-text">Have insider knowledge? Download the skill, load it into your own Claude, and it turns your notes into structured rules the classifier obeys as a mandate.</span>
+          <button data-action="downloadSample" data-key="deal_context_skill" class="btn btn--outline ctx-skill-btn">${ICON_DOWNLOAD}<span>Download context skill</span></button>
         </div>
         <textarea id="ctx-textarea" class="textarea" placeholder="Type or paste any context that should guide the classification…" data-oninput="onCtxInput">${escapeHtml(state.userDealContext)}</textarea>
         <div class="file-drop-strip" data-action="onCtxBrowse" data-ondrop="onCtxDrop" data-ondragover="onDragOver">

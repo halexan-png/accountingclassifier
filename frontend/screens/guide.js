@@ -11,6 +11,7 @@ import { renderMarkdown } from './markdown.js';
 const TOP_TABS = [
   { key: 'getting_started', label: 'Getting Started' },
   { key: 'odyssey', label: "What's Going On" },
+  { key: 'additional_context', label: 'Additional Context' },
 ];
 
 // The six memo/plutos_gneseos/ documents, in reading order. The "Specifics"
@@ -67,6 +68,12 @@ export function render(state) {
           <div class="sample-download-row">
             <button data-action="downloadSample" data-key="sample_ga" class="btn btn--outline">${ICON_DOWNLOAD}<span>Download sample G&amp;A workbook</span></button>
             <button data-action="downloadSample" data-key="sample_at" class="btn btn--outline">${ICON_DOWNLOAD}<span>Download sample A&amp;T workbook</span></button>
+          </div>
+        ` : ''}
+
+        ${state.guideKey === 'additional_context' ? `
+          <div class="sample-download-row">
+            <button data-action="downloadSample" data-key="deal_context_skill" class="btn btn--outline">${ICON_DOWNLOAD}<span>Download context skill (SKILL.md)</span></button>
           </div>
         ` : ''}
 

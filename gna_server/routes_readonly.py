@@ -38,9 +38,16 @@ _DOWNLOAD_PATHS = {
 # Static, always-present repo files served through the same /api/download/{key}
 # route but deliberately NOT in _DOWNLOAD_PATHS: the Guide's Getting Started tab
 # links to these directly by key, independent of any workbook upload or run.
+#
+# deal_context_skill is the downloadable Claude Skill (a single SKILL.md) that
+# turns an operator's insider deal knowledge into the tiered XML the Additional
+# Context box obeys as a mandate -- offered from the Context modal and the
+# Guide's "Additional Context" tab. FileResponse names it by path.name, so it
+# saves as SKILL.md.
 _STATIC_DOWNLOAD_PATHS = {
     "sample_ga": _MEMO_ROOT / "sample_ga_workbook.xlsx",
     "sample_at": _MEMO_ROOT / "sample_at_workbook.xlsx",
+    "deal_context_skill": config.REPO_ROOT / "skills" / "deal-context-builder" / "SKILL.md",
 }
 
 # The Guide screen's three sections (v2 UI handoff §4.11, rebuilt): Getting
@@ -51,6 +58,9 @@ _STATIC_DOWNLOAD_PATHS = {
 _DOC_PATHS = {
     "getting_started": _MEMO_ROOT / "getting_started.txt",
     "odyssey": _MEMO_ROOT / "odyssey.txt",
+    # Guide's "Additional Context" tab: how to write context the classifier
+    # obeys, and where the downloadable skill fits.
+    "additional_context": _MEMO_ROOT / "additional_context.txt",
     "pipeline_overview": _SPECIFICS_ROOT / "pipeline_overview.txt",
     "invoice_rules": _SPECIFICS_ROOT / "invoice_rules.txt",
     "context_tiering": _SPECIFICS_ROOT / "CONTEXT_TIERING_AND_EVIDENCE_RULES.txt",

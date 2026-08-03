@@ -1,0 +1,104 @@
+Writing Good Additional Context
+
+Additional Context is the box on the launch screen (the "Add context" tile)
+where you tell the classifier something only a person knows — a property sold
+mid-quarter, a counterparty whose name always means one of our deals, a vendor
+that is always routine for us. This page explains why it is the most powerful
+input you have, and how to phrase it so the model actually obeys it. If you'd
+rather not hand-write it, download the skill at the bottom and let Claude build
+it for you.
+
+
+WHY THIS BOX OUTRANKS EVERYTHING
+------------------------------------------------------------
+
+The classifier reads its inputs in tiers. The rulebook (the doctrine) is the
+default, the known-deal index is a lookup aid, and this box — your context — is
+the top authority. When you write an explicit rule here and its conditions are
+met by a row or its invoice, the model applies the outcome you specified,
+literally, ahead of its own standard judgment. It will also name your rule in
+its reasoning whenever that rule is in play, so you can audit that each one did
+what you meant.
+
+That power only works if the context is phrased as a rule the model can act on.
+"Watch out for the Redwood stuff" gives it nothing to fire on. "Any charge whose
+invoice names 1600 Market St dated on or after 2025-03-31 is non-recurring"
+gives it an exact condition and an exact outcome. Same knowledge, phrased to be
+obeyed.
+
+
+THE ONE THING THAT MAKES A RULE FIRE
+------------------------------------------------------------
+
+A condition can only be checked against what is actually written on a row or in
+its attached invoice — a name, a date, a keyword, an account number. It cannot
+see what you know in your head. So if the tie is pure insider knowledge, pin the
+rule to the handle that does show up on those rows: the vendor or payee, the
+matter number, the entity id, the invoice number. When in doubt, ask yourself
+"what actually appears on those rows that we can key off of?" and write the rule
+around that.
+
+
+WHAT GOOD CONTEXT LOOKS LIKE
+------------------------------------------------------------
+
+The strongest context is a short list of specific rules, each with three parts:
+what to look for (a name, keyword, or date test), where to look (the row, its
+invoice, or both), and what outcome to apply (non-recurring, human review, or —
+if you're sure it isn't routine but don't want to pick — just "flag" and let the
+doctrine choose). Give each rule its own plain-language intent so the reasoning
+can cite it back to you.
+
+Keep it tight — a handful of precise rules beats a page of prose every time. And
+remember: typing into the box is a one-time, this-run-only override. A note you
+want to keep should be saved into the deal-context file so it carries to the
+next quarter.
+
+
+THE STRUCTURED (XML) FORMAT
+------------------------------------------------------------
+
+Rules written as a small XML block — one condition-to-outcome mandate each —
+are the most legible to the model and the most reliably obeyed. You do not have
+to author that by hand. Download the skill below, load it into your own Claude,
+paste in whatever notes you already have (or none), and it will interview you
+for the missing specifics and hand back a ready-to-paste block. Copy that block
+into the Additional Context box, and the classifier treats it as top-tier
+mandate on the next run.
+
+
+USING THE SKILL IN YOUR OWN CLAUDE
+------------------------------------------------------------
+
+Once you've downloaded SKILL.md, open a chat in your own Claude and drag the
+file straight into the message box, then send it. Claude reads it and steps into
+the deal-context-builder role. From there, just talk to it: tell it what you
+know in plain words, and paste in whatever you already have in the context box.
+It will ask a few follow-up questions to pin down the specifics, then hand back
+a finished block for you to copy into Additional Context.
+
+
+HOW TO ABSTRACT WHAT YOU KNOW SO THE AI READS IT WELL
+------------------------------------------------------------
+
+The way you phrase something matters as much as what you say. The model reads a
+specific, structured rule far better than a paragraph of narrative, so aim for
+the same shape the skill writes out. Give each fact its own rule, and give that
+rule three parts: a trigger (what to look for), a place to look (the row, its
+invoice, or both), and a result (non-recurring, human review, or just flag it).
+
+Two habits do most of the work. First, one fact per rule -- don't fold three
+situations into one sentence; the model applies clean, separate rules far more
+reliably than a compound one. Second, tie every rule to something that actually
+appears on the row or its invoice -- a vendor name, a matter number, an entity,
+an invoice number, a date -- never to knowledge that lives only in your head. If
+the only thing you truly know is "row 1196 is the Bush deal," find what shows up
+on that row that the model can see (the payee, the matter number) and key the
+rule to that instead.
+
+Then trim. Drop the hedging and the backstory and keep the decision. "This
+vendor sometimes does deal work but usually doesn't, so maybe keep an eye on it"
+gives the model nothing; "flag any charge from this vendor whose invoice names a
+matter number" gives it an exact trigger and an exact result. The tighter and
+more concrete you are, the more reliably the classifier does what you meant --
+and the skill is built to push you toward exactly that.

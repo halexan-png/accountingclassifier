@@ -601,6 +601,28 @@ def test_download_sample_workbooks(client):
     assert client.get("/api/download/sample_at").status_code == 200
 
 
+def test_download_deal_context_skill(client):
+    # The downloadable Claude Skill that builds the Additional Context XML. Served
+    # through the same static-download route as the sample workbooks; saved as
+    # SKILL.md (FileResponse names it by the file on disk).
+    resp = client.get("/api/download/deal_context_skill")
+    assert resp.status_code == 200
+    assert "SKILL.md" in resp.headers.get("content-disposition", "")
+    # It's a real, non-empty skill file with frontmatter, not a stub.
+    assert b"name: deal-context-builder" in resp.content
+
+
+def test_docs_additional_context_tab(client):
+    # The Guide's "Additional Context" tab reads memo/additional_context.txt and
+    # gets the same plain-text -> markdown heading promotion as the other memo
+    # docs (title line -> '#', ALL-CAPS/dashes section -> '##').
+    resp = client.get("/api/docs/additional_context")
+    assert resp.status_code == 200
+    markdown = resp.json()["markdown"]
+    assert markdown.startswith("# Writing Good Additional Context")
+    assert "## WHY THIS BOX OUTRANKS EVERYTHING" in markdown
+
+
 def test_static_frontend_is_never_cached(client):
     # The no-build ES-module frontend must be served with Cache-Control: no-store
     # so a browser can't keep running a stale app.js/guide.js against a restarted

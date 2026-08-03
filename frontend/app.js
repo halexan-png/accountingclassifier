@@ -330,7 +330,10 @@ async function downloadSampleFile(key) {
     // honor it so the saved file keeps its real name, falling back to the key.
     const cd = res.headers.get('content-disposition') || '';
     const match = /filename="([^"]+)"/i.exec(cd) || /filename=([^;]+)/i.exec(cd);
-    const filename = match ? match[1].trim() : `${key}.xlsx`;
+    // Fallback only matters if the server omits a filename; keys aren't all
+    // spreadsheets now (the skill download is a SKILL.md), so infer by key.
+    const fallback = key === 'deal_context_skill' ? 'SKILL.md' : `${key}.xlsx`;
+    const filename = match ? match[1].trim() : fallback;
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -343,7 +346,7 @@ async function downloadSampleFile(key) {
     // object URL is freed before the click's save has claimed it.
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   } catch (err) {
-    showBanner('error', `Could not download the sample workbook: ${err.message}`);
+    showBanner('error', `Could not download the file: ${err.message}`);
   }
 }
 

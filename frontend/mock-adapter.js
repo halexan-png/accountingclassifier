@@ -47,6 +47,7 @@ const MOCK_DOCS = {
   context_tiering: '# Context Tiering & Evidence\n\nMock content for offline UI dev.\n',
   input_format: '# Input File Format\n\nMock content for offline UI dev.\n',
   risk_notes: '# Risk & Reference Notes\n\nMock content for offline UI dev.\n',
+  additional_context: '# Additional Context\n\nMock content for offline UI dev — real copy lives in memo/additional_context.txt.\n',
 };
 
 let settingsStore = { ...MOCK_SETTINGS };
