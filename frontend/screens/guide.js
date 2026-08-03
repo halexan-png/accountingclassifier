@@ -73,7 +73,7 @@ export function render(state) {
 
         ${state.guideKey === 'additional_context' ? `
           <div class="sample-download-row">
-            <button data-action="downloadSample" data-key="deal_context_skill" class="btn btn--outline">${ICON_DOWNLOAD}<span>Download context skill (SKILL.md)</span></button>
+            <button data-action="downloadSample" data-key="additional_context_skill" class="btn btn--outline">${ICON_DOWNLOAD}<span>Download context skill (SKILL.md)</span></button>
           </div>
         ` : ''}
 

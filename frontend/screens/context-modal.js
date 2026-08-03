@@ -23,7 +23,7 @@ export function render(state) {
         </div>
         <div class="ctx-skill-strip">
           <span class="ctx-skill-text">Have insider knowledge? Download the skill, load it into your own Claude, and it turns your notes into structured rules the classifier obeys as a mandate.</span>
-          <button data-action="downloadSample" data-key="deal_context_skill" class="btn btn--outline ctx-skill-btn">${ICON_DOWNLOAD}<span>Download context skill</span></button>
+          <button data-action="downloadSample" data-key="additional_context_skill" class="btn btn--outline ctx-skill-btn">${ICON_DOWNLOAD}<span>Download context skill</span></button>
         </div>
         <textarea id="ctx-textarea" class="textarea" placeholder="Type or paste any context that should guide the classification…" data-oninput="onCtxInput">${escapeHtml(state.userDealContext)}</textarea>
         <div class="file-drop-strip" data-action="onCtxBrowse" data-ondrop="onCtxDrop" data-ondragover="onDragOver">

@@ -601,15 +601,15 @@ def test_download_sample_workbooks(client):
     assert client.get("/api/download/sample_at").status_code == 200
 
 
-def test_download_deal_context_skill(client):
+def test_download_additional_context_skill(client):
     # The downloadable Claude Skill that builds the Additional Context XML. Served
     # through the same static-download route as the sample workbooks; saved as
     # SKILL.md (FileResponse names it by the file on disk).
-    resp = client.get("/api/download/deal_context_skill")
+    resp = client.get("/api/download/additional_context_skill")
     assert resp.status_code == 200
     assert "SKILL.md" in resp.headers.get("content-disposition", "")
     # It's a real, non-empty skill file with frontmatter, not a stub.
-    assert b"name: deal-context-builder" in resp.content
+    assert b"name: additional-context-builder" in resp.content
 
 
 def test_docs_additional_context_tab(client):

@@ -330,7 +330,7 @@ async function downloadSampleFile(key) {
     const match = /filename="([^"]+)"/i.exec(cd) || /filename=([^;]+)/i.exec(cd);
     // Fallback only matters if the server omits a filename; keys aren't all
     // spreadsheets now (the skill download is a SKILL.md), so infer by key.
-    const fallback = key === 'deal_context_skill' ? 'SKILL.md' : `${key}.xlsx`;
+    const fallback = key === 'additional_context_skill' ? 'SKILL.md' : `${key}.xlsx`;
     const filename = match ? match[1].trim() : fallback;
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

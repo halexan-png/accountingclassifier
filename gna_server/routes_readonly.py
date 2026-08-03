@@ -39,15 +39,15 @@ _DOWNLOAD_PATHS = {
 # route but deliberately NOT in _DOWNLOAD_PATHS: the Guide's Getting Started tab
 # links to these directly by key, independent of any workbook upload or run.
 #
-# deal_context_skill is the downloadable Claude Skill (a single SKILL.md) that
-# turns an operator's insider deal knowledge into the tiered XML the Additional
-# Context box obeys as a mandate -- offered from the Context modal and the
-# Guide's "Additional Context" tab. FileResponse names it by path.name, so it
-# saves as SKILL.md.
+# additional_context_skill is the downloadable Claude Skill (a single SKILL.md)
+# that turns an operator's insider knowledge -- deal-related or not -- into the
+# tiered XML the Additional Context box obeys as a mandate -- offered from the
+# Context modal and the Guide's "Additional Context" tab. FileResponse names it
+# by path.name, so it saves as SKILL.md.
 _STATIC_DOWNLOAD_PATHS = {
     "sample_ga": _MEMO_ROOT / "sample_ga_workbook.xlsx",
     "sample_at": _MEMO_ROOT / "sample_at_workbook.xlsx",
-    "deal_context_skill": config.REPO_ROOT / "skills" / "deal-context-builder" / "SKILL.md",
+    "additional_context_skill": config.REPO_ROOT / "skills" / "additional-context-builder" / "SKILL.md",
 }
 
 # The Guide screen's three sections (v2 UI handoff §4.11, rebuilt): Getting

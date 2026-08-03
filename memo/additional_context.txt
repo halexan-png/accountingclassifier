@@ -72,8 +72,9 @@ USING THE SKILL IN YOUR OWN CLAUDE
 
 Once you've downloaded SKILL.md, open a chat in your own Claude and drag the
 file straight into the message box, then send it. Claude reads it and steps into
-the deal-context-builder role. From there, just talk to it: tell it what you
-know in plain words, and paste in whatever you already have in the context box.
+the additional-context-builder role. From there, just talk to it: tell it what
+you know in plain words, and paste in whatever you already have in the context
+box.
 It will ask a few follow-up questions to pin down the specifics, then hand back
 a finished block for you to copy into Additional Context.
 
