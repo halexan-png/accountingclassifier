@@ -97,12 +97,14 @@ through as they appear, not forced to USD and one.
 
 Internally, the two uploads are combined into one flat, single-sheet
 workbook — sheet name `G&A MRI Records - With Link` — in a fixed column
-order. This is also the layout required of a single file uploaded
-directly, already flattened: `PERIOD`, `REF`, `SOURCE`, `ENTITYID`,
-`ACCTNUM`, `DEPARTMENT`, `AMT`, `DESCRPN`, `PDENTRY`, `ENTRDATE`,
-`OCURRCODE`, `ADDLDESC`, `LASTDATE`, `USERID`, `Category`, `Quarter`,
-`Image URL`, `Image URL - Hyperlink`, `Exchange Rate`, `USD Amount`, and
-`Source Tab` — twenty-one columns, in that order.
+order. Unlike section 2's requirement (those twenty header strings must
+all be present, in any order), this is the exact position each column
+occupies once flattened — and it's also the layout required of a single
+file uploaded directly, already pre-flattened: `PERIOD`, `REF`, `SOURCE`,
+`ENTITYID`, `ACCTNUM`, `DEPARTMENT`, `AMT`, `DESCRPN`, `PDENTRY`,
+`ENTRDATE`, `OCURRCODE`, `ADDLDESC`, `LASTDATE`, `USERID`, `Category`,
+`Quarter`, `Image URL`, `Image URL - Hyperlink`, `Exchange Rate`, `USD
+Amount`, and `Source Tab` — twenty-one columns, in that order.
 
 Of these, the pipeline consumes fourteen fields, matched by a
 case-insensitive substring alias against row one, which makes the layout

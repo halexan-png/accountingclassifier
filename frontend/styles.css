@@ -241,6 +241,10 @@ img { max-width: 100%; }
 }
 .btn--plain { border: 1px solid var(--line-5); background: #fff; color: var(--ink-primary-alt); }
 .btn--danger { background: var(--error-ink); color: #fff; }
+/* Grayed while disabled -- e.g. the reset-credentials confirm button before the
+   arming lever is flipped -- so it reads as not-yet-clickable instead of a live
+   red button. Mirrors .btn--dark:disabled below. */
+.btn--danger:disabled { background: #E2E4E7; color: #A5A8AD; box-shadow: none; }
 .btn--full { width: 100%; }
 
 /* ---------------------------------------------------------------------
@@ -453,6 +457,29 @@ img { max-width: 100%; }
 .ready-row { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border-radius: var(--radius-sm); background: var(--surface-well); border: 1px solid var(--line-1); }
 .ready-checkbox { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--action-mint); cursor: pointer; }
 .ready-copy { font-weight: 600; font-size: 13.5px; color: var(--ink-primary-alt); line-height: 1.5; }
+
+/* Reset-credentials "lever" (Settings → Security confirm modal). A deliberate
+   two-state toggle, NOT a one-click control, that arms the destructive Reset
+   button so a single stray click can never trigger it: the operator has to
+   flip the lever first. Built on a visually-hidden checkbox so it keeps the
+   delegated change handler + full keyboard/AT support; the track+knob are the
+   visible switch. */
+.reset-lever-row { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+.lever { position: relative; display: inline-flex; flex: 0 0 auto; cursor: pointer; }
+.lever-input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+.lever-track {
+  display: inline-block; width: 48px; height: 27px; border-radius: 999px;
+  background: var(--line-6); border: 1px solid var(--line-5);
+  transition: background .16s ease, border-color .16s ease; position: relative;
+}
+.lever-knob {
+  position: absolute; top: 2px; left: 2px; width: 21px; height: 21px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35);
+  transition: transform .16s ease;
+}
+.lever-input:checked + .lever-track { background: var(--action-mint); border-color: var(--action-mint); }
+.lever-input:checked + .lever-track .lever-knob { transform: translateX(21px); }
+.lever-input:focus-visible + .lever-track { outline: 2px solid var(--action-mint); outline-offset: 2px; }
 .stop-banner { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--warning-bg); color: var(--warning-ink-dark); font-weight: 600; font-size: 13px; }
 
 /* ---------------------------------------------------------------------
@@ -519,23 +546,26 @@ img { max-width: 100%; }
 
 /* Editorial reading column for the Guide's documents — a serif stack, a
    comfortable line measure well short of the page shell's 1200px, and a
-   restrained heading hierarchy: h1 as a small tracked-out nameplate (every
-   doc's own title line, promoted server-side — see routes_readonly.py's
-   _promote_plain_text_headings), h2 as a quieter in-page section break. */
+   heading hierarchy where the doc's own title (h1, promoted server-side —
+   see routes_readonly.py's _promote_plain_text_headings) reads as the most
+   prominent thing on the page, with h2 in-page section breaks clearly a
+   step down from it. */
 .markdown-view {
   line-height: 1.75; color: var(--ink-secondary); font-size: 17.5px; max-width: 700px; margin: 0 auto;
   font-family: Georgia, 'Times New Roman', Times, ui-serif, serif;
 }
 .markdown-view h1 {
-  color: var(--ink-primary-alt); font-weight: 700; font-size: 14px;
-  letter-spacing: .13em; text-transform: uppercase; margin: 0 0 16px;
+  color: var(--ink-primary-alt); font-weight: 700; font-size: 25px;
+  letter-spacing: .02em; margin: 0 0 20px;
 }
 .markdown-view h2 {
-  color: var(--ink-primary-alt); font-weight: 700; font-size: 21px; margin: 32px 0 12px;
+  color: var(--ink-primary-alt); font-weight: 700; font-size: 19px; margin: 32px 0 12px;
 }
 .markdown-view h3 { color: var(--ink-primary-alt); font-weight: 700; }
 .markdown-view p { margin: 0 0 18px; }
+.markdown-view ul, .markdown-view ol { margin: 0 0 18px; padding-left: 1.3em; }
 .markdown-view li { margin-bottom: 6px; }
+.markdown-view li:last-child { margin-bottom: 0; }
 .markdown-view code { background: var(--surface-well); padding: 2px 6px; border-radius: 4px; font-size: .85em; font-family: 'SFMono-Regular', Consolas, monospace; }
 .markdown-view pre { background: var(--surface-well); padding: 14px; border-radius: var(--radius-sm); overflow-x: auto; font-family: 'SFMono-Regular', Consolas, monospace; }
 .markdown-view a { color: var(--link-blue); }

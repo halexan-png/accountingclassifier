@@ -1,0 +1,137 @@
+FIELD GLOSSARY: COLUMNS, FLAGS, AND DEAL-PROFILE FIELDS
+
+The exact meaning of every column and flag the pipeline adds to your
+data, and every field in the deal profile sheet — reference material for
+looking something up mid-review. For the operational behaviors these
+fields reflect (a stopped run, a truncated invoice, a rough deal sweep),
+see Specifics -> Risk & Reference Notes.
+
+
+DOWNLOADED FILE COLUMNS
+------------------------------------------------------------
+
+Fourteen columns are added to your original data:
+
+CLASSIFICATION — the verdict: recurring, non-recurring, human review,
+skipped (negative amount), or reclass.
+
+BASIS — what drove the verdict: a system-close rule, an invoice's own
+contents, a recognized deal, the row's routine-sounding text on its own,
+a reclass keyword, a fixed M&A-account rule, or nothing identifiable.
+
+PHASE — which stage produced the decision: the opening M&A sweep, or the
+main classification pass.
+
+HAD_INVOICE — whether the row pointed to an invoice at all, by link or
+by a number found in its own text.
+
+INVOICE_ACCESSED — whether a document was actually opened and read,
+independent of what it said once opened.
+
+INVOICE_READ — the model's own claim about the invoice it was given,
+kept separate from INVOICE_ACCESSED so the two can be checked against
+each other.
+
+INVOICE_DATE — whatever date the model found on the invoice, when there
+was one to find.
+
+REASONING — the model's own account of why it landed on this verdict.
+
+EVIDENCE — the specific text or invoice detail it's pointing to in
+support of that reasoning.
+
+MISSING_INFO — human-review rows only: the exact open question that
+kept the row from being settled outright.
+
+INVOICE_POINTER — where the invoice actually came from: the link it
+followed, or the local file and the page range it read.
+
+INVOICE_ERROR — explains why, when an invoice was referenced but never
+read, it couldn't be.
+
+FLAGS — whatever notable conditions attach to the row; see Flag Values,
+below.
+
+DEAL_SWEEP_STATUS — M&A-account rows only: what happened when the
+opening sweep tried to gather this row's deal information.
+
+
+FLAG VALUES
+------------------------------------------------------------
+
+Thirteen flags can appear in the FLAGS column, alone or in combination:
+
+CLOSEGL_USER — a system-close entry, automatically recurring, never
+sent to the model at all.
+
+RECLASS_RULE — the row's own text contained the word "reclass," so it
+was labeled a bookkeeping reclassification in the very first pass,
+before the model ever saw it.
+
+SKIPPED_NEGATIVE — the row carried a negative dollar amount and was set
+aside for this run.
+
+HAD_INVOICE — the row pointed to an invoice, whether by link or by a
+number found in its own text.
+
+INVOICE_ACCESSED — a document was actually opened and read.
+
+INVOICE_UNAVAILABLE — an invoice was referenced but could not be read.
+
+DEAL_PROFILE_MATCH — the row's text matched something in the known-deal
+list. A suspicion only; the doctrine still has to confirm it before it
+becomes a verdict.
+
+AMOUNT_BLANK — the dollar amount was blank, or a dead formula.
+
+DEAL_SWEEP_FAILED — the opening sweep tried and failed to gather this
+row's deal information.
+
+DEAL_SWEEP_SKIPPED — this row wasn't swept at all, either because it
+fell outside the quarters selected or because the sweep relied on a
+reused deal list instead.
+
+BASIS_MISMATCH — the model claimed it was relying on a known deal, but
+hadn't actually recognized one. Rather than guess at the real reason,
+the record is quietly corrected to show no identifiable basis.
+
+INVOICE_READ_MISMATCH — an invoice was sent to the model, but what it
+reports about reading it doesn't line up with what actually happened.
+Flagged for whoever's auditing the row; not corrected automatically.
+
+INVOICE_TRUNCATED — the invoice ran long enough that only its opening
+and closing pages were read (see Specifics -> Risk & Reference Notes,
+item 3). Whatever sat in the middle may have gone unseen.
+
+
+DEAL PROFILE SHEET COLUMNS
+------------------------------------------------------------
+
+Ten columns describe each known deal:
+
+NAME — the deal's settled canonical name. SUPPORTING_ROWS — which rows
+in this run actually contributed to the entry. MATTER_NUMBERS and
+INVOICE_NUMBERS — the legal matter and invoice numbers seen tied to it.
+QUARTERS — which quarters' activity have touched it so far. ALIASES —
+other names or spellings the system has learned mean the same deal.
+PROPERTIES and ENTITYIDS — the properties and entity IDs named in
+connection with it. ADVISORS_SEEN — the advisors or vendors associated
+with it. EVIDENCE — the specific text supporting why the entry exists at
+all.
+
+
+HOW DEALS ARE MATCHED AND MERGED
+------------------------------------------------------------
+
+Deals are matched by name, without regard to capitalization — the same
+name seen twice, however it's cased, is treated as one deal, not two.
+When a match is found, nothing is thrown away and nothing is duplicated:
+every list on the entry — aliases, matter numbers, invoice numbers,
+properties, entity IDs, advisors, supporting rows, the quarters touched
+— is combined with what's already there, and only genuinely new evidence
+is appended to what's already recorded.
+
+The practical effect is that a deal doesn't fragment or dilute just
+because it resurfaces under a slightly different spelling next quarter.
+It accumulates instead — one entry, growing richer each time the deal
+reappears, rather than multiplying.

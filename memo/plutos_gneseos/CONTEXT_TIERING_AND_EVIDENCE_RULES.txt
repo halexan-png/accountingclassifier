@@ -26,8 +26,9 @@ it looks at a single row, always in this order:
    applies to every row, every run, with no exceptions built in.
 
 3. A short statement of which source outranks which.
-   Fixed, and deliberately kept out of the doctrine file — see "Why this
-   is locked down," below.
+   Fixed, and deliberately kept out of the doctrine file. The full
+   ranking is spelled out once, in "The Three-Tier Authority Rule,"
+   below.
 
 4. Company Norms (data/input/companynorm.md — editable in Settings,
    optional).
@@ -82,12 +83,9 @@ temporary context, ending with whatever was built fresh for this run.
   and billed at a cheaper, cached rate — across every batch in the run,
   instead of being reprocessed from scratch each time.
 
-Worth flagging: shown last is not the same as outranking everything. The
-known-deal index is physically the last thing the model reads, but it
-carries the least authority of the three sources that bear on a decision
-(see below) — it only ever suggests that a name might belong to a deal,
-and never settles anything on its own. Its position is about cost, not
-importance.
+Worth flagging: shown last is not the same as outranking everything.
+Position here is about cost, not authority — see "The Three-Tier
+Authority Rule," below, for how the three sources actually rank.
 
 
 THE THREE-TIER AUTHORITY RULE

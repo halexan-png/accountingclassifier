@@ -59,6 +59,18 @@ const state = {
   closeConfirmOpen: false,
   closing: false,
 
+  // "Reset credentials" (Settings → Security). Wipes the API key + Graph IDs
+  // from .env and stops the server (routes_lifecycle.reset_credentials), so the
+  // next launch re-runs first-time setup. resetConfirmOpen drives the confirm
+  // dialog; resetAck gates the danger button (the operator must tick "I
+  // understand this is permanent"); resetting is true only while the POST is in
+  // flight. On success the terminal end screen shows reset-specific copy, keyed
+  // off closedReason so it says "credentials cleared" rather than "closed".
+  resetConfirmOpen: false,
+  resetAck: false,
+  resetting: false,
+  closedReason: null, // null | 'reset' — which copy the terminal 'closed' screen shows
+
   // Q2 two-file upload + validation: the multi-tab G&A workbook and the flat
   // A&T workbook are flattened server-side into ONE workbook that everything
   // downstream reads. Phase tracks that flatten+validate step.
@@ -253,6 +265,26 @@ async function closeApplication() {
   // ping would start failing and could otherwise race us to the timeout screen.
   if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
   setState({ sessionClosed: true, closeConfirmOpen: false, closing: false });
+}
+
+// "Reset credentials" (Settings → Security): wipe the API key + Graph IDs from
+// System/.env and stop the server, so the next launch runs first-time setup
+// fresh. Parallels closeApplication() exactly — same graceful shutdown, same
+// stop-polling-then-show-the-end-screen dance — but sets closedReason so the
+// end screen shows reset-specific copy. A 409 (run in progress) or any other
+// error surfaces as a banner and leaves the app usable.
+async function resetCredentials() {
+  if (state.resetting) return;
+  setState({ resetting: true });
+  try {
+    await adapter.resetCredentials();
+  } catch (err) {
+    setState({ resetting: false, resetConfirmOpen: false });
+    showBanner('error', `Could not reset credentials: ${err.message}`);
+    return;
+  }
+  if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+  setState({ sessionClosed: true, closedReason: 'reset', resetConfirmOpen: false, resetting: false });
 }
 
 // A transient <a download> click (rather than navigating the tab) triggers a
@@ -516,6 +548,25 @@ const actions = {
   },
   openSettingsEdit: () => setState({ settingsEditOpen: true }),
   closeSettingsEdit: () => setState({ settingsEditOpen: false }),
+
+  // -- Settings: Reset credentials (wipes .env + stops the server) --
+  openResetCredentials: () => setState({ resetConfirmOpen: true, resetAck: false }),
+  cancelResetCredentials: () => { if (!state.resetting) setState({ resetConfirmOpen: false }); },
+  toggleResetAck: (event) => {
+    // Reflect the lever WITHOUT a full re-render. A setState here rebuilds
+    // root.innerHTML, which replays the modal's omFade/omPop entrance animation
+    // (and the main-view's omFade behind it) on every flip -- the "aggressive
+    // reanimation". The CSS switch already slides from the input's native
+    // :checked state, so we only poke state + flip the Reset button's
+    // disabled/aria here, the same satellite-update pattern onSettingsInput uses
+    // for the doctrine editor. state stays in sync for any later real render.
+    const armed = event.target.checked;
+    pokeState({ resetAck: armed });
+    event.target.setAttribute('aria-checked', String(armed));
+    const btn = document.getElementById('reset-confirm-btn');
+    if (btn) btn.disabled = !armed;
+  },
+  confirmResetCredentials: () => { void resetCredentials(); },
   onSettingsInput: (event) => pokeState({ settingsContent: event.target.value }),
   saveSettings: async () => {
     try {
@@ -912,6 +963,7 @@ document.addEventListener('keydown', (event) => {
   if (state.ctxOpen) actions.closeCtx();
   else if (state.configOpen) actions.closeConfig();
   else if (state.closeConfirmOpen) actions.cancelCloseApp();
+  else if (state.resetConfirmOpen) actions.cancelResetCredentials();
   else if (state.settingsEditOpen) actions.closeSettingsEdit();
 });
 
@@ -978,6 +1030,7 @@ function render() {
     ${state.configOpen ? configModal.render(state) : ''}
     ${state.ctxOpen ? contextModal.render(state) : ''}
     ${state.closeConfirmOpen ? renderCloseConfirm(state) : ''}
+    ${state.resetConfirmOpen ? renderResetConfirm(state) : ''}
   `;
 
   if (state.ctxOpen) updateCtxSatellites();
@@ -998,6 +1051,42 @@ function renderCloseConfirm(state) {
         <div class="modal-confirm-actions">
           <button data-action="cancelCloseApp" class="btn btn--plain" ${busy ? 'disabled' : ''}>Cancel</button>
           <button data-action="confirmCloseApp" class="btn btn--danger" ${busy ? 'disabled' : ''}>${busy ? 'Closing…' : 'Close application'}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// "Reset credentials?" confirm dialog (Settings → Security). Guards against an
+// accidental click with a deliberate multi-step gate: the Security button never
+// resets anything itself — it only opens THIS modal, which explains what will
+// happen, and the destructive "Reset and close" button stays disabled until the
+// operator flips the arming LEVER (a toggle switch, not a one-click control, so
+// a stray click can't trip it). Only then does clicking Reset wipe the stored
+// key/IDs and close the app. Copy is static, so nothing here needs escaping.
+// Backdrop/Cancel/Escape all route to cancelResetCredentials, which no-ops while
+// a reset is already in flight.
+function renderResetConfirm(state) {
+  const busy = state.resetting;
+  const armed = state.resetAck; // the lever is flipped
+  const canReset = armed && !busy;
+  return `
+    <div class="modal-overlay" data-action="cancelResetCredentials">
+      <div class="modal-panel modal-panel--confirm" data-action="stopPropagation" role="dialog" aria-modal="true" aria-label="Reset credentials">
+        <div class="modal-title">Reset credentials?</div>
+        <p class="modal-confirm-body">Your Anthropic API key and Microsoft Graph tenant/client IDs are <strong>permanently deleted</strong> from this computer, and the app closes. Nothing else on your machine is touched. The next time you launch <strong>Start.cmd</strong>, the app has no credentials, so it walks you through entering them again from scratch.</p>
+        <div class="modal-confirm-reminder">${ICON_WARNING}<span>This can't be undone — have your API key (and any Graph IDs) on hand before you continue.</span></div>
+        <div class="ready-row" style="margin-top:14px">
+          <div class="reset-lever-row">
+            <label class="lever" title="${armed ? 'Reset is armed — flip back to cancel' : 'Flip to arm the reset'}">
+              <input type="checkbox" id="reset-ack-checkbox" class="lever-input" role="switch" aria-checked="${armed}" aria-labelledby="reset-ack-label" ${armed ? 'checked' : ''} data-onchange="toggleResetAck">
+              <span class="lever-track"><span class="lever-knob"></span></span>
+            </label>
+            <label id="reset-ack-label" for="reset-ack-checkbox" class="ready-copy">Flip this lever to confirm you understand — it's permanent, and you'll re-enter everything on the next launch. This unlocks the Reset button.</label>
+          </div>
+        </div>
+        <div class="modal-confirm-actions">
+          <button data-action="cancelResetCredentials" class="btn btn--plain" ${busy ? 'disabled' : ''}>Cancel</button>
+          <button id="reset-confirm-btn" data-action="confirmResetCredentials" class="btn btn--danger" ${canReset ? '' : 'disabled'}>${busy ? 'Resetting…' : 'Reset and close'}</button>
         </div>
       </div>
     </div>`;

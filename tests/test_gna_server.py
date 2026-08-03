@@ -424,6 +424,76 @@ def test_shutdown_without_exit_hook_is_503(client, monkeypatch):
     assert resp.status_code == 503
 
 
+def test_reset_credentials_refused_while_run_active(client, monkeypatch):
+    """Resetting credentials must never kill a live (paid) run -- 409 while a run
+    is active, same guard as shutdown."""
+    from gna_server import routes_lifecycle
+
+    monkeypatch.setattr(routes_lifecycle.manager, "is_active", lambda: True)
+    resp = client.post("/api/reset-credentials", json={})
+    assert resp.status_code == 409
+
+
+def test_reset_credentials_wipes_env_and_stops_server(client, monkeypatch, tmp_path):
+    """POST /api/reset-credentials blanks the API key + Graph IDs in .env IN
+    PLACE (leaving comments and unrelated keys untouched) and fires the exit
+    hook. Pins that the reset both clears the stored secret and takes the server
+    down, so the next launch re-runs first-time setup. _ENV_PATH is monkeypatched
+    to a temp file so the developer's real System/.env is never touched."""
+    from gna_server import lifecycle, routes_lifecycle
+
+    env = tmp_path / ".env"
+    env.write_text(
+        "# a comment\n"
+        "ANTHROPIC_API_KEY=sk-ant-secret\n"
+        "GRAPH_TENANT_ID=tenant-123\n"
+        "GRAPH_CLIENT_ID=client-456\n"
+        "GNA_UI_PORT=8420\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(routes_lifecycle, "_ENV_PATH", env)
+    monkeypatch.setattr(routes_lifecycle.manager, "is_active", lambda: False)
+    fired = {"n": 0}
+    lifecycle.register_exit(lambda: fired.__setitem__("n", fired["n"] + 1))
+    try:
+        resp = client.post("/api/reset-credentials", json={})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        assert set(body["cleared"]) == {"ANTHROPIC_API_KEY", "GRAPH_TENANT_ID", "GRAPH_CLIENT_ID"}
+        assert fired["n"] == 1
+    finally:
+        lifecycle.register_exit(None)  # never leak the hook into other tests
+
+    text = env.read_text(encoding="utf-8")
+    # Secrets are gone, but the keys remain (blank) so the launcher sees them.
+    assert "sk-ant-secret" not in text
+    assert "tenant-123" not in text
+    assert "client-456" not in text
+    assert "ANTHROPIC_API_KEY=" in text
+    assert "GRAPH_TENANT_ID=" in text
+    assert "GRAPH_CLIENT_ID=" in text
+    # Unrelated lines survive verbatim.
+    assert "# a comment" in text
+    assert "GNA_UI_PORT=8420" in text
+
+
+def test_reset_credentials_without_exit_hook_leaves_env_untouched_and_503(client, monkeypatch, tmp_path):
+    """With no exit hook (TestClient), the reset must NOT wipe .env and reports
+    503 -- we only clear credentials once the server is genuinely going down, so
+    a failed stop never leaves a blanked-out file behind a still-running server."""
+    from gna_server import lifecycle, routes_lifecycle
+
+    env = tmp_path / ".env"
+    env.write_text("ANTHROPIC_API_KEY=sk-ant-secret\n", encoding="utf-8")
+    monkeypatch.setattr(routes_lifecycle, "_ENV_PATH", env)
+    monkeypatch.setattr(routes_lifecycle.manager, "is_active", lambda: False)
+    lifecycle.register_exit(None)
+    resp = client.post("/api/reset-credentials", json={})
+    assert resp.status_code == 503
+    assert "sk-ant-secret" in env.read_text(encoding="utf-8")  # nothing wiped
+
+
 def test_run_without_workbook_is_400(client):
     resp = client.post("/api/run", json={"kind": "run", "quarter": "2026Q1"})
     assert resp.status_code == 400
@@ -491,10 +561,10 @@ def test_docs_endpoint_reads_real_repo_file(client):
     assert len(resp.json()["markdown"]) > 0
 
 
-def test_docs_all_seven_keys_resolve(client):
+def test_docs_all_eight_keys_resolve(client):
     for key in (
         "getting_started", "odyssey", "pipeline_overview", "invoice_rules",
-        "context_tiering", "input_format", "risk_notes",
+        "context_tiering", "input_format", "risk_notes", "field_glossary",
     ):
         resp = client.get(f"/api/docs/{key}")
         assert resp.status_code == 200, key

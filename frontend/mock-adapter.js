@@ -17,6 +17,7 @@
 //   confirmRun(confirm_id, answer) -> {ok}
 //   cancelRun() -> {ok}
 //   shutdownApp() -> {ok}
+//   resetCredentials() -> {ok}
 //   getResults() -> {summary, artifacts}
 //   downloadUrl(key) -> string (a Blob URL standing in for the real file)
 //   getDoc(key) -> {markdown}
@@ -300,6 +301,13 @@ export const adapter = {
     await delay(80);
     // No real server to stop in mock mode -- just acknowledge so the offline UI
     // can still demo the close-confirm and end screen.
+    return { ok: true };
+  },
+
+  async resetCredentials() {
+    await delay(80);
+    // No real .env/server in mock mode -- just acknowledge so the offline UI can
+    // still demo the reset confirm and the reset end screen.
     return { ok: true };
   },
 

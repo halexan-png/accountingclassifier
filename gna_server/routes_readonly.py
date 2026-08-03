@@ -45,7 +45,7 @@ _STATIC_DOWNLOAD_PATHS = {
 
 # The Guide screen's three sections (v2 UI handoff §4.11, rebuilt): Getting
 # Started and What's Going On are each a single doc; Specifics is a
-# five-document sub-index of memo/plutos_gneseos/. QUICKSTART.md/HOW_IT_WORKS.md
+# six-document sub-index of memo/plutos_gneseos/. QUICKSTART.md/HOW_IT_WORKS.md
 # at the repo root are no longer wired into this screen (superseded by the
 # memo/ set below) but are deliberately left on disk, not deleted.
 _DOC_PATHS = {
@@ -58,7 +58,11 @@ _DOC_PATHS = {
     # (real markdown headings throughout) would suggest -- if it's ever
     # renamed back to .md, this path needs updating to match.
     "input_format": _SPECIFICS_ROOT / "INTENDED_INPUT_FILE.txt",
+    # risk_notes (narrative, read-once behavior) and field_glossary (lookup
+    # reference) were one document until they were split for the two
+    # different reading modes they serve.
     "risk_notes": _SPECIFICS_ROOT / "operator_risk_and_reference_notes.txt",
+    "field_glossary": _SPECIFICS_ROOT / "field_glossary.txt",
 }
 
 _DASH_LINE_RE = re.compile(r"^-{3,}\s*$")

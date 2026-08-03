@@ -31,12 +31,18 @@ export function renderMarkdown(md) {
   let inCode = false, codeLines = [];
   let listItems = null; // 'ul' | 'ol' | null
   let paraLines = [];
+  // Once true, a blank line has interrupted the open list and hasn't been
+  // resolved yet -- a same-kind item right after still belongs to this list
+  // (a "loose list", one blank line between items for source readability),
+  // but anything else means the list actually ended at the blank line.
+  let blankSinceList = false;
 
   function flushPara() {
     if (paraLines.length) { html.push(`<p>${inline(paraLines.join(' '))}</p>`); paraLines = []; }
   }
   function flushList() {
     if (listItems) { html.push(`</${listItems}>`); listItems = null; }
+    blankSinceList = false;
   }
 
   for (const raw of lines) {
@@ -50,7 +56,11 @@ export function renderMarkdown(md) {
     }
     if (inCode) { codeLines.push(line); continue; }
 
-    if (!line.trim()) { flushPara(); flushList(); continue; }
+    if (!line.trim()) {
+      flushPara();
+      if (listItems) blankSinceList = true; else flushList();
+      continue;
+    }
 
     const heading = line.match(/^(#{1,6})\s+(.*)$/);
     if (heading) {
@@ -69,12 +79,25 @@ export function renderMarkdown(md) {
       const kind = ol ? 'ol' : 'ul';
       if (listItems !== kind) { flushList(); html.push(`<${kind}>`); listItems = kind; }
       html.push(`<li>${inline((ol || ul)[1])}</li>`);
+      blankSinceList = false;
       continue;
     }
-    flushList();
-
     const quote = line.match(/^\s*>\s?(.*)$/);
-    if (quote) { flushPara(); html.push(`<blockquote>${inline(quote[1])}</blockquote>`); continue; }
+    if (quote) { flushPara(); flushList(); html.push(`<blockquote>${inline(quote[1])}</blockquote>`); continue; }
+
+    if (listItems && !blankSinceList) {
+      // Lazy continuation: a hard-wrapped line with no marker of its own,
+      // directly following a list item (no blank line between), extends
+      // that item instead of closing the list and spilling the rest of the
+      // sentence into an orphan paragraph. A blank line first means this is
+      // a new paragraph, not a continuation -- see the blank-line branch.
+      const last = html[html.length - 1];
+      if (last && last.startsWith('<li>') && last.endsWith('</li>')) {
+        html[html.length - 1] = `${last.slice(0, -5)} ${inline(line.trim())}</li>`;
+        continue;
+      }
+    }
+    flushList();
 
     paraLines.push(line.trim());
   }

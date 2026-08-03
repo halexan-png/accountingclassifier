@@ -1,80 +1,54 @@
-TEN THINGS AN OPERATOR SHOULD BE ABLE TO ANSWER, AND CURRENTLY CAN'T
+FOUR THINGS AN OPERATOR SHOULD BE ABLE TO ANSWER, AND CURRENTLY CAN'T
 
-Ten candidates for the memo, written out in full so each can be judged on
-its own merits and kept or set aside independently. Nothing here has been
-folded into the live documents yet. Every fact below was checked directly
-against the pipeline's code, not carried over from memory.
+Four behaviors of this pipeline that aren't obvious from a single run.
+Every fact below was checked directly against the pipeline's code, not
+carried over from memory. For what every column, flag, and deal-profile
+field actually means, see Specifics -> Field Glossary.
 
 
 1. A STOPPED RUN DOES NOT RESUME — IT STARTS OVER, AND CHARGES YOU AGAIN
 ------------------------------------------------------------
 
-There is no resume path anywhere in this system. None. A run that stops
-for any reason — a closed laptop, a crash, a deliberate Stop, the spend
-rail tripping — does not pick up where it left off when you run it again.
-It starts the quarter over from the first row.
+Bottom line: there is no resume path anywhere in this system. However a
+run stops — a closed laptop, a crash, a deliberate Stop click, or the
+spend rail tripping — whatever had already finished at that moment is
+kept (it's written to disk as it happens, so it isn't lost), and
+everything else is marked "not processed." Finishing the quarter means
+running it again from the first row, and running it again means
+reclassifying and repaying for every row, including the ones already
+finished and paid for the first time. A second run is never a
+continuation of the first — that's the costliest misunderstanding
+available here.
 
-What's saved is only what had already finished at the moment of the
-interruption; that much is written to disk as it happens, so it isn't
-lost. Everything else is marked "not processed" in the file you'd
-download at that point. But finishing the quarter — actually completing
-it — means running it again, and running it again means reclassifying
-every row, including the ones that already finished and were already
-paid for the first time. The natural assumption, that a second run simply
-continues the first, is the wrong one, and it's the costliest
-misunderstanding available here.
+What differs by trigger:
+
+Spend rail — a backstop against a runaway bill, not a budget line. It
+only fires if a run's actual cost climbs to twice its own pre-run
+forecast, deliberately loose so an ordinary overrun never trips it.
+Firing stops the run through the same path above; it does not refund
+what was already spent.
+
+Cancel vs. Stop — Cancel lives on the forecast screen, before a single
+row has been sent anywhere; walking away there costs nothing. Stop lives
+on the running screen, after spending has already begun; clicking it
+isn't instant (whatever's already in flight finishes first), and it does
+not undo the spend already committed.
 
 
-2. THE SPEND RAIL STOPPING A RUN DOES NOT UNDO THE MONEY ALREADY SPENT
+2. ONE THING DOES CARRY OVER BETWEEN RUNS — AND IT ISN'T YOUR ROW DECISIONS
 ------------------------------------------------------------
 
-The spend rail is a backstop against a runaway bill, not a budget line.
-It only fires if a run's actual cost climbs to twice its own pre-run
-forecast — deliberately loose, so an ordinary run that lands a little
-over estimate never hears from it at all. When it does fire, it stops the
-run through the same path described above: what's finished is kept, what
-isn't gets marked unprocessed.
+The running list of known deals, built from this quarter's acquisition
+and transaction activity, carries forward into every run after it — each
+run adds to that list rather than replacing it, so it only grows.
 
-The part worth saying plainly: tripping the spend rail doesn't refund
-anything, and it doesn't mean the rows already classified are somehow
-free the second time around. Finishing the quarter afterward still means
-a full second run, and a full second run still means paying again for
-every row — the ones the spend rail already paid for included.
+Row-by-row decisions are the opposite: they never carry over. A second
+run will recognize deals it has seen before, but it still re-decides,
+and re-charges for, every single row. Don't confuse the two — the deal
+list remembers; your classification decisions do not.
 
 
-3. STOP AND CANCEL ARE TWO DIFFERENT BUTTONS, WITH TWO DIFFERENT PRICES
-------------------------------------------------------------
-
-Cancel lives on the forecast screen, before a single row has been sent
-anywhere. Walking away there costs nothing — no API call has been made
-yet, so there's nothing to salvage and nothing to lose.
-
-Stop lives on the running screen, after spending has already begun.
-Clicking it doesn't halt things instantly — whatever's already in flight
-finishes first, and only then does the run actually stop. From there, it
-behaves exactly like an interruption: finished rows are kept, the rest
-are marked unprocessed, and finishing the quarter later means the same
-full re-run, and the same repeated cost, described in the two items
-above. Cancel is free. Stop is not undoing spend already committed.
-
-
-4. ONE THING DOES CARRY OVER BETWEEN RUNS — AND IT ISN'T YOUR ROW DECISIONS
-------------------------------------------------------------
-
-Everything above describes what does not survive between runs. Exactly
-one thing does: the running list of known deals, built from this
-quarter's acquisition and transaction activity and carried forward into
-every run after it. Each fresh run adds whatever new deal information it
-gathers into that same list rather than replacing it — the list only
-grows.
-
-This is a genuinely different mechanism from resuming a run, and it's
-easy to confuse the two. The deal list remembers. Your row-by-row
-decisions do not. A second run will recognize deals it has seen before,
-but it will still re-decide, and re-charge for, every single row.
-
-
-5. AN INVOICE LONGER THAN TWENTY PAGES IS ONLY PARTLY READ
+3. AN INVOICE LONGER THAN TWENTY PAGES IS ONLY PARTLY READ
 ------------------------------------------------------------
 
 Up to twenty pages, the system reads an invoice in full. Past that
@@ -82,160 +56,25 @@ length, it reads only the first two pages and the last two — nothing in
 between. A thirty-page invoice is read across four of its thirty pages;
 the other twenty-six are never opened.
 
-This isn't a failure exactly, and it isn't announced anywhere a person
-would naturally look. It shows up only as a flag on the row in question,
-easy to miss and, as it stands, explained nowhere at all. A deciding
-detail — a date, a deal's name — sitting on page twelve of a thirty-page
-invoice is simply never seen, and the row is still classified as if
-nothing were missing.
+This isn't announced anywhere a person would naturally look — only as a
+flag on the row itself (INVOICE_TRUNCATED — see Specifics -> Field
+Glossary). A deciding detail sitting mid-document is simply never seen,
+and the row is still classified as if nothing were missing.
 
 
-6. A ROUGH START TO THE DEAL SWEEP DOESN'T PAUSE YOUR RUN — IT QUIETLY CARRIES ON
+4. A ROUGH DEAL SWEEP DOESN'T PAUSE YOUR RUN — IT QUIETLY CARRIES ON
 ------------------------------------------------------------
 
 Before classification begins, the system sweeps this quarter's
 acquisition and transaction rows to build its list of known deals. If
-that sweep runs into trouble — some rows it simply can't gather
-information for, or, in the extreme, no deals found at all — the run
-does not stop to ask whether to proceed. It logs what happened and
-carries on into classification anyway, on the reasoning that a thin deal
-list is still better than none, and that any M&A row the sweep couldn't
-gather is labeled non-recurring by fixed rule regardless, not by
-judgment that could be compromised.
+that sweep runs into trouble — some rows it can't gather information
+for, or no deals found at all — the run does not stop to ask whether to
+proceed. It logs what happened and carries on into classification
+anyway, on the reasoning that a thin deal list is still better than
+none, and that any M&A row the sweep couldn't gather is labeled
+non-recurring by fixed rule regardless, not by judgment that could be
+compromised.
 
-The practical effect for an operator: if this quarter's sweep had a rough
-outing, nothing in the running app will say so in the moment. The
-recognizable-deals vocabulary available to the rest of the run may simply
-be thinner than usual, silently.
-
-
-7. WHAT EVERY COLUMN IN THE DOWNLOADED FILE ACTUALLY MEANS
-------------------------------------------------------------
-
-Fourteen columns are added to your original data. In order:
-
-CLASSIFICATION carries the verdict itself — recurring, non-recurring,
-human review, skipped for a negative amount, or reclass.
-
-BASIS names what actually drove that verdict: a system-close rule, an
-invoice's own contents, a recognized deal, the row's routine-sounding
-text on its own, a reclass keyword, a fixed M&A-account rule, or nothing
-identifiable.
-
-PHASE says which stage of the run produced the decision — the opening
-M&A sweep, or the main classification pass.
-
-HAD_INVOICE says whether the row pointed to an invoice at all, by link or
-by a number found in its own text.
-
-INVOICE_ACCESSED says whether a document was actually opened and read,
-independent of what it said once opened.
-
-INVOICE_READ is the model's own claim about the invoice it was given —
-kept separate from INVOICE_ACCESSED so the two can be checked against
-each other.
-
-INVOICE_DATE is whatever date the model found on the invoice, when there
-was one to find.
-
-REASONING is the model's own account of why it landed on this verdict.
-
-EVIDENCE is the specific text or invoice detail it's pointing to in
-support of that reasoning.
-
-MISSING_INFO, on a human-review row only, names the exact open question
-that kept it from being settled outright.
-
-INVOICE_POINTER records where the invoice actually came from — the link
-it followed, or the local file and the page range it read.
-
-INVOICE_ERROR explains why, when an invoice was referenced but never
-read, it couldn't be.
-
-FLAGS lists whatever notable conditions attach to the row — see the next
-item.
-
-DEAL_SWEEP_STATUS, on M&A-account rows only, reports what happened when
-the opening sweep tried to gather this row's deal information.
-
-
-8. WHAT EVERY FLAG IN THAT COLUMN ACTUALLY MEANS
-------------------------------------------------------------
-
-Thirteen flags can appear, alone or in combination:
-
-CLOSEGL_USER — a system-close entry, automatically recurring, never sent
-to the model at all.
-
-RECLASS_RULE — the row's own text contained the word "reclass," so it was
-labeled a bookkeeping reclassification in the very first pass, before the
-model ever saw it.
-
-SKIPPED_NEGATIVE — the row carried a negative dollar amount and was set
-aside for this run.
-
-HAD_INVOICE — the row pointed to an invoice, whether by link or by a
-number found in its own text.
-
-INVOICE_ACCESSED — a document was actually opened and read.
-
-INVOICE_UNAVAILABLE — an invoice was referenced but could not be read.
-
-DEAL_PROFILE_MATCH — the row's text matched something in the known-deal
-list. A suspicion only; the doctrine still has to confirm it before it
-becomes a verdict.
-
-AMOUNT_BLANK — the dollar amount was blank, or a dead formula.
-
-DEAL_SWEEP_FAILED — the opening sweep tried and failed to gather this
-row's deal information.
-
-DEAL_SWEEP_SKIPPED — this row wasn't swept at all, either because it fell
-outside the quarters selected or because the sweep relied on a reused
-deal list instead.
-
-BASIS_MISMATCH — the model claimed it was relying on a known deal, but
-hadn't actually recognized one. Rather than guess at the real reason, the
-record is quietly corrected to show no identifiable basis.
-
-INVOICE_READ_MISMATCH — an invoice was sent to the model, but what it
-reports about reading it doesn't line up with what actually happened.
-Flagged for whoever's auditing the row; not corrected automatically.
-
-INVOICE_TRUNCATED — the invoice ran long enough that only its opening and
-closing pages were read. Whatever sat in the middle may have gone unseen.
-
-
-9. WHAT EVERY COLUMN IN THE DEAL PROFILE SHEET ACTUALLY MEANS
-------------------------------------------------------------
-
-Ten columns describe each known deal:
-
-NAME, the deal's settled canonical name. SUPPORTING_ROWS, which rows in
-this run actually contributed to the entry. MATTER_NUMBERS and
-INVOICE_NUMBERS, the legal matter and invoice numbers seen tied to it.
-QUARTERS, which quarters' activity have touched it so far. ALIASES, other
-names or spellings the system has learned mean the same deal. PROPERTIES
-and ENTITYIDS, the properties and entity IDs named in connection with it.
-ADVISORS_SEEN, the advisors or vendors associated with it. EVIDENCE, the
-specific text supporting why the entry exists at all.
-
-Most of these read for themselves; they're included here mainly so the
-full list exists somewhere plain, next to everything else.
-
-
-10. HOW THE SAME DEAL, SEEN AGAIN, DOESN'T BECOME TWO DEALS
-------------------------------------------------------------
-
-Deals are matched by name, without regard to capitalization — the same
-name seen twice, however it's cased, is treated as one deal, not two.
-When a match is found, nothing is thrown away and nothing is duplicated:
-every list on the entry — aliases, matter numbers, invoice numbers,
-properties, entity IDs, advisors, supporting rows, the quarters touched —
-is combined with what's already there, and only genuinely new evidence is
-appended to what's already recorded.
-
-The practical effect is that a deal doesn't fragment or dilute just
-because it resurfaces under a slightly different spelling next quarter.
-It accumulates instead — one entry, growing richer each time the deal
-reappears, rather than multiplying.
+The practical effect for an operator: nothing in the running app says so
+in the moment. The recognizable-deals vocabulary available to the rest
+of the run may simply be thinner than usual, silently.

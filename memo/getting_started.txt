@@ -20,16 +20,19 @@ same tab — a download button for each, no need to go looking for the
 memo folder itself.
 
 Continue leads to Launch, where three more inputs wait, none of them
-required. Additional Context takes free-form notes about the quarter —
-typed directly, or dropped in as a .txt, .md, or .docx file — guided at
-3,500 words; going over doesn't block anything, it just flags a warning
-that more context can dilute the reasoning. External Invoices takes
-already-named PDFs, singly, by the folder, or dragged in wholesale;
-anything that isn't a PDF is quietly set aside, and each file is capped
-at 20 MB. OneDrive Access only matters
-if this workbook's invoice links point at OneDrive or SharePoint —
-connect it, or check the box acknowledging those links won't be read.
-Run insists on one or the other before it will go anywhere.
+required:
+
+- Additional Context — free-form notes about the quarter, typed
+  directly or dropped in as a .txt, .md, or .docx file, guided at 3,500
+  words. Going over doesn't block anything; it just flags a warning
+  that more context can dilute the reasoning.
+- External Invoices — already-named PDFs, added singly, by the folder,
+  or dragged in wholesale. Anything that isn't a PDF is quietly set
+  aside, and each file is capped at 20 MB.
+- OneDrive Access — only matters if this workbook's invoice links point
+  at OneDrive or SharePoint. Connect it, or check the box acknowledging
+  those links won't be read; Run insists on one or the other before it
+  will go anywhere.
 
 Configure comes next, and isn't optional. Pick the quarter to analyze
 from the dropdown, drawn straight from what's actually sitting in the
@@ -47,7 +50,7 @@ From there the run is live: Build Profile, then Classify, with rows
 arriving as they're decided and a running line of cost and time
 remaining. Stop is there if it's needed, though it isn't instant —
 whatever's already in flight finishes first. What stopping actually
-costs you belongs to Odyssey, not to this page.
+costs you belongs to the "What's Going On" tab, not to this page.
 
 When the run finishes, classified.xlsx downloads on its own — check the
 Downloads folder — with a Download button on screen if it's needed

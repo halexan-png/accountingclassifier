@@ -198,6 +198,16 @@ export const adapter = {
     return jsonPost('/api/shutdown', {});
   },
 
+  // Deliberate "Reset credentials" (Settings → Security). Wipes the stored API
+  // key + Graph IDs from System/.env and stops the server the same graceful way
+  // as shutdownApp (POST /api/reset-credentials -> gna_server/routes_lifecycle),
+  // so the next launch re-runs first-time setup. Like shutdownApp, NOT wrapped
+  // in a swallow-all catch: a 409 ("a run is in progress") must surface to the
+  // operator as a banner, so let the error propagate.
+  async resetCredentials() {
+    return jsonPost('/api/reset-credentials', {});
+  },
+
   async getResults() {
     return jfetch('/api/results');
   },

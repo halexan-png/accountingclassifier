@@ -1,6 +1,6 @@
 // guide.js — Guide (v2 UI handoff §4.11, rebuilt): three sections rendered
 // from the real memo/ docs. Getting Started and What's Going On are each a
-// single document; Specifics is a five-document sub-index of
+// single document; Specifics is a six-document sub-index of
 // memo/plutos_gneseos/, picked via a secondary tab row. Doc content is still
 // fetched by key through adapter.getDoc/state.guideMarkdown exactly as
 // before — this file only changes which keys exist and how they're grouped.
@@ -13,16 +13,23 @@ const TOP_TABS = [
   { key: 'odyssey', label: "What's Going On" },
 ];
 
-// The five memo/plutos_gneseos/ documents, in reading order. The "Specifics"
+// The six memo/plutos_gneseos/ documents, in reading order. The "Specifics"
 // top-level tab is this same list's first entry — clicking it is identical
 // to picking the first sub-document, so no separate action/state is needed
 // to represent "Specifics" as its own concept.
+//
+// risk_notes and field_glossary were one document until they were split:
+// risk_notes covers narrative, read-once operational behavior (a stopped
+// run, a truncated invoice); field_glossary is pure lookup reference (what
+// a column or flag means) — different reading modes, so they get separate
+// tabs rather than one document serving both.
 const SPECIFICS_TABS = [
   { key: 'pipeline_overview', label: 'Pipeline Overview' },
   { key: 'invoice_rules', label: 'Invoice Matching' },
   { key: 'context_tiering', label: 'Context Tiering & Evidence' },
   { key: 'input_format', label: 'Input File Format' },
   { key: 'risk_notes', label: 'Risk & Reference Notes' },
+  { key: 'field_glossary', label: 'Field Glossary' },
 ];
 
 function isSpecificsKey(key) {

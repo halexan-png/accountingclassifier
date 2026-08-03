@@ -80,7 +80,11 @@ export function render(state) {
           <span class="security-label">Network</span>
           <span class="badge badge--ok">Loopback only (127.0.0.1)</span>
         </div>
-        <div class="tile-hint" style="margin-top:8px">The API key lives in .env and is never sent to the browser — it can't be entered or edited here.</div>
+        <div class="tile-hint" style="margin-top:8px">The API key and Graph IDs live in .env and are never sent to the browser — they can't be viewed or entered here. You can, however, clear them to force a fresh setup at the next launch.</div>
+
+        <button data-action="openResetCredentials" class="btn btn--danger" style="margin-top:18px">Reset credentials</button>
+        <div class="tile-hint" style="margin-top:8px">Permanently wipes the Anthropic API key and the Microsoft Graph tenant/client IDs from this computer, then closes the app. The next time you double-click <strong>Start.cmd</strong>, it asks you to enter them from scratch.</div>
+        <div class="tile-hint" style="margin-top:6px">Note: if you enter an API key but skip the Graph IDs, the launcher won't ask for the Graph IDs again on later launches. The only way to be prompted for them again is to reset here — which clears the API key too, so you re-enter everything together.</div>
       </div>
     </div>
     ${state.settingsEditOpen ? renderEditModal(state, tab) : ''}`;
