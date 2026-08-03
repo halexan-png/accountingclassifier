@@ -1,6 +1,6 @@
 {
   "input_tokens_limit": 10000000,
-  "measured_at": "2026-08-03T14:44:15.124087+00:00",
+  "measured_at": "2026-08-03T18:34:04.162656+00:00",
   "model": "claude-sonnet-4-6",
   "output_tokens_limit": 2000000,
   "requests_limit": 10000

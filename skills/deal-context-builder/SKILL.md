@@ -38,18 +38,37 @@ row never says "Bush"), don't write a condition on "Bush." Find the handle that
 number — and key the rule on that. **This is the main thing to dig for:**
 *"What actually appears on those rows that we can match on?"*
 
+**Look before you ask.** Don't ask the user "what shows up on those rows?" as a
+first move. Check what's already been fed to you — invoice text, `descrptn`,
+`adddesc`, `entityid`, `acctnum`, vendor/payee, matter or invoice numbers, or any
+rows/exports/files already in the conversation or workspace — and pull the
+handle straight out of that. `descrptn` and `adddesc` are the two fields most
+likely to carry the human-readable clue (a project name, counterparty, property
+address), so scan those first, then the invoice text, then the rest. Only ask
+the user when nothing in the material already provided surfaces a usable
+handle, or when what you found is ambiguous and needs their confirmation.
+
 ## How to work
 
 1. **Get their raw material.** Ask them to paste whatever's in the box now (or
    their scratch notes). Nothing written yet is fine — go straight to asking.
-2. **Find the smallest job that helps** — don't build more than they need:
+2. **Mine what's already fed before asking anything else.** Scan any invoice
+   text, row data, `descrptn`/`adddesc` fields, exports, or files already in the
+   conversation or workspace for the handle(s) that back the identity or rule —
+   vendor names, matter numbers, entity ids, property addresses, invoice
+   numbers. This is where the handle should come from by default, not from
+   asking the user to recall it.
+3. **Find the smallest job that helps** — don't build more than they need:
    - *Tighten* — restructure prose they already wrote into rules.
    - *One rule* — one situation (a sold property, one deal keyword).
    - *Full ruleset* — several rules for the whole quarter.
-3. **Ask for what's missing, never guess.** Each rule needs four things: the
-   visible handle, the exact value(s), the date and its direction, and the
-   outcome. If any is unclear, ask — this drives real financial decisions.
-4. **Emit the XML**, then give paste instructions.
+4. **Ask only for what the fed material couldn't answer.** Each rule needs four
+   things: the visible handle, the exact value(s), the date and its direction,
+   and the outcome. Get the handle from the data first (step 2); ask the user
+   only for the pieces genuinely absent from anything they've given you — insider
+   facts like which deal a handle belongs to, the sale/assignment date, or the
+   intended outcome. Never guess those.
+5. **Emit the XML**, then give paste instructions.
 
 ## The questions that keep rules from misfiring
 
@@ -59,8 +78,11 @@ where rules usually go wrong:
 - **Is the handle specific enough?** Short common words match too much: a bare
   `Bush` also hits "Bush Street" and "Bushnell"; `S4` hits "S4 building" and
   "VS4-100." Prefer a distinctive phrase, or a `regex` with word boundaries.
-  Ask: *"Is this name unique on those rows, or could it show up on unrelated
-  charges?"*
+  Check this yourself first — if invoice text, rows, or other fed data are
+  available, search them for the candidate handle and see whether it collides
+  with unrelated charges. Only ask the user — *"Is this name unique on those
+  rows, or could it show up on unrelated charges?"* — when you have no data to
+  check it against.
 - **Which direction is the date?** Every date test needs a direction — flagged
   *on or after* a sale/assignment date, or *before* it? Confirm the exact date
   and which side counts.
@@ -152,8 +174,9 @@ classifier pick the bucket).
 - No two rules contradict (flag *and* mark recurring the same charge).
 - Every rule has an `id` and `<intent>`; every date test has a `fallback` if a
   row might lack an invoice.
-- Nothing invented — every name, date, and number came from the user. If you
-  needed one they didn't give, you asked.
+- Nothing invented — every name, date, and number came either from material
+  already fed to you (invoice text, rows, `descrptn`/`adddesc`, files) or from
+  the user. If a needed piece wasn't in either, you asked.
 - The block is tight — if it's long, cut prose and keep rules.
 
 ## Then tell them
