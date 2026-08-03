@@ -1,6 +1,6 @@
-FOUR THINGS AN OPERATOR SHOULD BE ABLE TO ANSWER, AND CURRENTLY CAN'T
+THREE THINGS AN OPERATOR SHOULD BE ABLE TO ANSWER, AND CURRENTLY CAN'T
 
-Four behaviors of this pipeline that aren't obvious from a single run.
+Three behaviors of this pipeline that aren't obvious from a single run.
 Every fact below was checked directly against the pipeline's code, not
 carried over from memory. For what every column, flag, and deal-profile
 field actually means, see Specifics -> Field Glossary.
@@ -35,20 +35,7 @@ isn't instant (whatever's already in flight finishes first), and it does
 not undo the spend already committed.
 
 
-2. ONE THING DOES CARRY OVER BETWEEN RUNS — AND IT ISN'T YOUR ROW DECISIONS
-------------------------------------------------------------
-
-The running list of known deals, built from this quarter's acquisition
-and transaction activity, carries forward into every run after it — each
-run adds to that list rather than replacing it, so it only grows.
-
-Row-by-row decisions are the opposite: they never carry over. A second
-run will recognize deals it has seen before, but it still re-decides,
-and re-charges for, every single row. Don't confuse the two — the deal
-list remembers; your classification decisions do not.
-
-
-3. AN INVOICE LONGER THAN TWENTY PAGES IS ONLY PARTLY READ
+2. AN INVOICE LONGER THAN TWENTY PAGES IS ONLY PARTLY READ
 ------------------------------------------------------------
 
 Up to twenty pages, the system reads an invoice in full. Past that
@@ -62,7 +49,7 @@ Glossary). A deciding detail sitting mid-document is simply never seen,
 and the row is still classified as if nothing were missing.
 
 
-4. A ROUGH DEAL SWEEP DOESN'T PAUSE YOUR RUN — IT QUIETLY CARRIES ON
+3. A ROUGH DEAL SWEEP DOESN'T PAUSE YOUR RUN — IT QUIETLY CARRIES ON
 ------------------------------------------------------------
 
 Before classification begins, the system sweeps this quarter's

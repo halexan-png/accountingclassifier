@@ -87,9 +87,8 @@ AMOUNT_BLANK — the dollar amount was blank, or a dead formula.
 DEAL_SWEEP_FAILED — the opening sweep tried and failed to gather this
 row's deal information.
 
-DEAL_SWEEP_SKIPPED — this row wasn't swept at all, either because it
-fell outside the quarters selected or because the sweep relied on a
-reused deal list instead.
+DEAL_SWEEP_SKIPPED — this row wasn't swept at all because it fell
+outside the quarters selected.
 
 BASIS_MISMATCH — the model claimed it was relying on a known deal, but
 hadn't actually recognized one. Rather than guess at the real reason,

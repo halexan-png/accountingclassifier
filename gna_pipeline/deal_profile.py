@@ -562,9 +562,9 @@ def _union(a: list[Any], b: list[Any]) -> list[Any]:
 
 
 def _merge_entry(entries_acc: dict[str, dict[str, Any]], key: str, data: dict[str, Any]) -> None:
-    """Fold one coerced entry (fresh from a batch, or folded from
-    existing_profile) into the accumulator, keyed by name.lower(). Unions
-    every list field; concatenates only novel evidence."""
+    """Fold one coerced entry (fresh from a batch) into the accumulator, keyed
+    by name.lower(). Unions every list field; concatenates only novel
+    evidence."""
     if key not in entries_acc:
         entries_acc[key] = {
             "name": data["name"],
@@ -576,7 +576,6 @@ def _merge_entry(entries_acc: dict[str, dict[str, Any]], key: str, data: dict[st
             "advisors_seen": list(data.get("advisors_seen") or []),
             "evidence": list(data.get("evidence") or []),
             "supporting_row_idxs": list(data.get("supporting_row_idxs") or []),
-            "_prior_quarters": list(data.get("_prior_quarters") or []),
         }
         return
 
@@ -592,33 +591,6 @@ def _merge_entry(entries_acc: dict[str, dict[str, Any]], key: str, data: dict[st
     ]
     existing["supporting_row_idxs"] = _union(
         existing["supporting_row_idxs"], data.get("supporting_row_idxs") or []
-    )
-    existing["_prior_quarters"] = _union(
-        existing["_prior_quarters"], data.get("_prior_quarters") or []
-    )
-
-
-def _fold_existing_entry(entries_acc: dict[str, dict[str, Any]], entry: dict[str, Any]) -> None:
-    """Fold one existing_profile entry into the accumulator FIRST (before any
-    batch is processed), preserving its supporting_row_idxs/quarters/evidence."""
-    name = str(entry.get("name", "")).strip()
-    if not name:
-        return
-    _merge_entry(
-        entries_acc,
-        name.lower(),
-        {
-            "name": name,
-            "aliases": entry.get("aliases") or [],
-            "matter_numbers": entry.get("matter_numbers") or [],
-            "invoice_numbers": entry.get("invoice_numbers") or [],
-            "properties": entry.get("properties") or [],
-            "entityids": entry.get("entityids") or [],
-            "advisors_seen": entry.get("advisors_seen") or [],
-            "evidence": entry.get("evidence") or [],
-            "supporting_row_idxs": entry.get("supporting_row_idxs") or [],
-            "_prior_quarters": entry.get("quarters") or [],
-        },
     )
 
 
@@ -674,7 +646,7 @@ def _derive_entries(
     for data in entries_acc.values():
         idxs = sorted({int(i) for i in data["supporting_row_idxs"]})
         supporting_rows = len(idxs)
-        quarters = set(data.get("_prior_quarters") or [])
+        quarters = set()
         for idx in idxs:
             q = quarter_of(row_period_map.get(idx) or "")
             if q:
@@ -936,7 +908,6 @@ def run_sweep(
     *,
     model: str,
     human_deals_md: str | None,
-    existing_profile: dict[str, Any] | None,
     rate_limits: dict | None,
     cost_cap_usd: float | None = None,
     emit: Callable[[DecisionRecord], None],
@@ -967,8 +938,7 @@ def run_sweep(
     cost_total: dict[str, float] = {}
 
     if not items:
-        profile = existing_profile if existing_profile is not None else _empty_profile_shape()
-        return profile, _zero_stats(), usage_total
+        return _empty_profile_shape(), _zero_stats(), usage_total
 
     stats: SweepStats = SweepStats(
         rows_selected=len(items),
@@ -985,15 +955,12 @@ def run_sweep(
     }
 
     entries_acc: dict[str, dict[str, Any]] = {}
-    for entry in (existing_profile or {}).get("entries", []) or []:
-        _fold_existing_entry(entries_acc, entry)
 
-    quarters_swept = set((existing_profile or {}).get("quarters", []) or [])
-    quarters_swept |= {
+    quarters_swept = {
         q for q in (quarter_of(p or "") for p in row_period_map.values()) if q
     }
     period_range = _merge_period_range(
-        (existing_profile or {}).get("period_range", "") or "",
+        "",
         [p for p in row_period_map.values() if p],
     )
 

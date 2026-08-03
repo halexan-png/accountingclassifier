@@ -72,10 +72,6 @@ export function render(state) {
           <span class="security-label">API key</span>
           <span class="badge ${state.apiKeyPresent ? 'badge--ok' : 'badge--warn'}">${state.apiKeyPresent ? 'Present' : 'Missing'}</span>
         </div>
-        <div class="security-row">
-          <span class="security-label">Local invoice library</span>
-          <span class="badge ${state.invoiceLibrary.dir_ready && state.invoiceLibrary.csv_ready ? 'badge--ok' : 'badge--warn'}">${state.invoiceLibrary.dir_ready && state.invoiceLibrary.csv_ready ? 'Ready' : 'Off'}</span>
-        </div>
         <div class="security-row" style="border-bottom:none">
           <span class="security-label">Network</span>
           <span class="badge badge--ok">Loopback only (127.0.0.1)</span>

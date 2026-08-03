@@ -11,12 +11,10 @@ argparse.Namespace onto this function's keyword arguments.
 
 There is no resume/reuse path anywhere in this spine: every `run` always
 reclassifies every in-scope row and always re-sweeps the quarter's M&A rows.
-The one thing that DOES persist and get reused across runs is the
-cross-quarter deal-vocabulary profile itself (quarter_deal_profile.json,
-loaded via `deal_profile.load_profile` and threaded into `run_sweep` as
-`existing_profile`) — a different mechanism from resume: it folds newly
-swept entries into the saved vocabulary rather than skipping any row's
-re-decision.
+There is also no cross-run persistence of the deal profile: each run's sweep
+rebuilds the quarter's deal vocabulary from scratch, from that quarter's own
+M&A rows only, and the saved quarter_deal_profile.json is overwritten with
+the current run's profile — never folded together with a prior one.
 
 Deliberately decoupled from argparse: every parameter here is a plain value,
 so the pipeline is callable (and testable) without building a Namespace.
@@ -404,7 +402,7 @@ def _quarter_skip_reasoning(quarters: list[str]) -> str:
 
 def _deal_sweep_skipped_record(item: WorkItem, *, reasoning: str) -> DecisionRecord:
     """Auto non_recurring record for an M&A WorkItem this run chose NOT to
-    sweep (outside selected quarters, or an existing profile was reused).
+    sweep (outside selected quarters).
     Mirrors deal_profile._sweep_record's shape; reuses the shared
     invoice-summary rule so the invoice column matches what the sweep itself
     would have written."""
@@ -704,27 +702,25 @@ def _stage9_phase1_sweep(
         return profile, sweep_records, interrupted, declined
 
     if not ma_scope_packets:
-        profile = deal_profile.load_profile(config.DEAL_PROFILE_JSON) or empty_deal_profile()
+        profile = empty_deal_profile()
         console.info(
-            f"no M&A rows in scope -- using existing deal profile at "
-            f"{config.DEAL_PROFILE_JSON} ({len(profile.get('entries', []) or [])} entr(ies)) "
-            f"without sweeping"
+            "no M&A rows in scope -- no deal profile built this run; "
+            "classification proceeds with no deal context"
         )
         return profile, sweep_records, interrupted, declined
 
-    existing = deal_profile.load_profile(config.DEAL_PROFILE_JSON)
     gate_stats: dict[str, int] | None = None
 
     try:
         profile, sweep_stats, _sweep_usage = deal_profile.run_sweep(
             client, selected, model=model, human_deals_md=human_deals_md,
-            existing_profile=existing, rate_limits=rate_limits,
+            rate_limits=rate_limits,
             cost_cap_usd=config.SPEND_CAP_MULTIPLIER * sweep_fc["cost_high_usd"],
             emit=emit_sweep,
         )
     except (KeyboardInterrupt, scheduling.SpendCapExceeded) as exc:
         interrupted = True
-        profile = existing if existing is not None else empty_deal_profile()
+        profile = empty_deal_profile()
         console.clear_status()
         stopped_by = (
             "interrupted" if isinstance(exc, KeyboardInterrupt)

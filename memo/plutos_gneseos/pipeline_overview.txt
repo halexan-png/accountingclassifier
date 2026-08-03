@@ -4,9 +4,7 @@ You supply two source workbooks. They're combined into one worklist.
 
 Before anything else, the rows describing a company acquisition or sale
 are pulled out and read first. They build a reference list of known
-deals — the vocabulary the rest of the run will recognize — and that list
-carries forward between runs instead of being rebuilt from nothing each
-time.
+deals — the vocabulary the rest of the run will recognize.
 
 Every other row is then given a verdict: recurring cost, non-recurring
 cost, or a case for a person to review. The known-deal list, together

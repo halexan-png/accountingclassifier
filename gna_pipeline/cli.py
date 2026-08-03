@@ -239,7 +239,7 @@ def cmd_deal_profile(args: argparse.Namespace) -> int:
     ma_packets = deal_profile.select_ma_packets(packets)
     if not ma_packets:
         console.warn("no M&A row(s) in the workbook; skipping the sweep")
-        profile = deal_profile.load_profile(config.DEAL_PROFILE_JSON) or pipeline.empty_deal_profile()
+        profile = pipeline.empty_deal_profile()
         index_text, report = prompts.deal_profile_context_index(profile)
         pipeline.write_context_txt(index_text)
         pipeline.print_context_report(report)
@@ -310,7 +310,6 @@ def cmd_deal_profile(args: argparse.Namespace) -> int:
     client = pipeline.build_client()
     rate_limits = pipeline.refresh_rate_limits(client, model, rate_limits)
     human_deals_md = deal_profile.load_human_deals_md()
-    existing = deal_profile.load_profile(config.DEAL_PROFILE_JSON)
 
     def emit_sweep(record: DecisionRecord) -> None:
         persistence.append_record(config.DEAL_RESULTS_JSONL, record)
@@ -319,7 +318,7 @@ def cmd_deal_profile(args: argparse.Namespace) -> int:
     try:
         profile, sweep_stats, usage = deal_profile.run_sweep(
             client, selected, model=model, human_deals_md=human_deals_md,
-            existing_profile=existing, rate_limits=rate_limits,
+            rate_limits=rate_limits,
             cost_cap_usd=config.SPEND_CAP_MULTIPLIER * sweep_fc["cost_high_usd"],
             emit=emit_sweep,
         )

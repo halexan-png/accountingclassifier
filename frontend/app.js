@@ -147,7 +147,6 @@ const state = {
   settingsContent: '',
   settingsEditOpen: false, // the expanded editor modal, opened from the doctrine's summary tile
   apiKeyPresent: false,
-  invoiceLibrary: { dir_ready: false, csv_ready: false },
 
   // Guide (v2 §4.11)
   guideKey: 'getting_started',
@@ -196,7 +195,6 @@ async function refreshServerState() {
   const s = await adapter.getState();
   pokeState({
     apiKeyPresent: s.api_key_present,
-    invoiceLibrary: s.invoice_library,
   });
   return s;
 }
